@@ -112,13 +112,23 @@ spec:
         ports:
         - containerPort: 9187
         env:
-        - name: DATA_SOURCE_NAME
-          value: "postgresql://linkding:$(POSTGRES_PASSWORD)@postgres:5432/linkding?sslmode=disable"
-        - name: POSTGRES_PASSWORD
+        - name: PGHOST
+          value: "postgres"  # Service name
+        - name: PGUSER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_USER
+        - name: PGPASSWORD
           valueFrom:
             secretKeyRef:
               name: postgres-secret
               key: POSTGRES_PASSWORD
+        - name: PGDATABASE
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_DB
         resources:
           requests:
             memory: "32Mi"
