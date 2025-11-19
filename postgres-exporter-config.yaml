@@ -6,17 +6,10 @@ metadata:
 data:
   postgres_exporter.yml: |
     queries:
-      db_size:
-        query: "SELECT datname, pg_database_size(datname) AS size FROM pg_database;"
+      - query: "SELECT datname, pg_database_size(datname) AS size FROM pg_database WHERE datname NOT IN ('template0', 'template1');"
         metrics:
-          - datname:
-              usage: "LABEL"
-              description: "Name of the database."
-          - size:
-              usage: "GAUGE"
-              description: "Size of the database in bytes."
-    exclude_databases:
-      - template0
-      - template1
-    auto_discovery:
-      enable: true
+          - name: db_size_size
+            help: "Size of the database in bytes"
+            type: GAUGE
+            labels:
+              - datname
