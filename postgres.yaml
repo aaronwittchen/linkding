@@ -112,20 +112,18 @@ spec:
         ports:
         - containerPort: 9187
         env:
-        - name: PGHOST
-          value: "postgres"
-        - name: PGUSER
+        - name: DATA_SOURCE_USER
           valueFrom:
             secretKeyRef:
               name: postgres-secret
               key: POSTGRES_USER
-        - name: PGPASSWORD
+        - name: DATA_SOURCE_PASS
           valueFrom:
             secretKeyRef:
               name: postgres-secret
               key: POSTGRES_PASSWORD
-        - name: PGDATABASE
-          value: "postgres"  # <-- Changed to system DB for stats
+        - name: DATA_SOURCE_URI
+          value: "postgres:5432/postgres?sslmode=disable"
         resources:
           requests:
             memory: "32Mi"
