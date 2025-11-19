@@ -109,6 +109,8 @@ spec:
           mountPath: /var/lib/postgresql/data
       - name: postgres-exporter
         image: prometheuscommunity/postgres-exporter:v0.15.0
+        args:
+        - --config.file=/etc/postgres_exporter.yml
         ports:
         - containerPort: 9187
         env:
