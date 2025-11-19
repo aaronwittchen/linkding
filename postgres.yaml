@@ -113,7 +113,7 @@ spec:
         - containerPort: 9187
         env:
         - name: PGHOST
-          value: "postgres"  # Service name
+          value: "postgres"
         - name: PGUSER
           valueFrom:
             secretKeyRef:
@@ -125,10 +125,7 @@ spec:
               name: postgres-secret
               key: POSTGRES_PASSWORD
         - name: PGDATABASE
-          valueFrom:
-            secretKeyRef:
-              name: postgres-secret
-              key: POSTGRES_DB
+          value: "postgres"  # <-- Changed to system DB for stats
         resources:
           requests:
             memory: "32Mi"
