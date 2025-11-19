@@ -32,6 +32,39 @@ spec:
     spec:
       securityContext:
         runAsUser: 1000
+      initContainers:
+      - name: migrate
+        image: sissbruecker/linkding:1.44.1
+        command:
+        - python
+        - manage.py
+        - migrate
+        - --noinput
+        env:
+        - name: LD_DB_ENGINE
+          value: "postgres"
+        - name: LD_DB_HOST
+          value: "postgres"
+        - name: LD_DB_PORT
+          value: "5432"
+        - name: LD_DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_DB
+        - name: LD_DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_USER
+        - name: LD_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_PASSWORD
+        volumeMounts:
+        - name: linkding-data
+          mountPath: /etc/linkding/data
       containers:
       - name: linkding
         image: sissbruecker/linkding:1.44.1
