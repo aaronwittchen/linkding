@@ -30,7 +30,7 @@ metadata:
 type: Opaque
 stringData:
   POSTGRES_USER: linkding
-  POSTGRES_PASSWORD: "CHANGE_THIS_PASSWORD_IMMEDIATELY"
+  POSTGRES_PASSWORD: "your-actual-password-here"
   POSTGRES_DB: linkding
   POSTGRES_HOST_AUTH_METHOD: scram-sha-256
 ---
@@ -112,18 +112,8 @@ spec:
         ports:
         - containerPort: 9187
         env:
-        - name: DATA_SOURCE_USER
-          valueFrom:
-            secretKeyRef:
-              name: postgres-secret
-              key: POSTGRES_USER
-        - name: DATA_SOURCE_PASS
-          valueFrom:
-            secretKeyRef:
-              name: postgres-secret
-              key: POSTGRES_PASSWORD
-        - name: DATA_SOURCE_URI
-          value: "postgres:5432/postgres?sslmode=disable"
+        - name: DATA_SOURCE_NAME
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/postgres?sslmode=disable"
         resources:
           requests:
             memory: "32Mi"
