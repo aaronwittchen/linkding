@@ -29,6 +29,11 @@ spec:
     metadata:
       labels:
         app: linkding
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/"
+        summary: "Linkding bookmark app"
     spec:
       securityContext:
         runAsUser: 1000
