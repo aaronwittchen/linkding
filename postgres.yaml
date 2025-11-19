@@ -30,7 +30,7 @@ metadata:
 type: Opaque
 stringData:
   POSTGRES_USER: linkding
-  POSTGRES_PASSWORD: "your-actual-password-here"
+  POSTGRES_PASSWORD: "your-actual-password-here"  # Replace with real pw
   POSTGRES_DB: linkding
   POSTGRES_HOST_AUTH_METHOD: scram-sha-256
 ---
@@ -113,7 +113,11 @@ spec:
         - containerPort: 9187
         env:
         - name: DATA_SOURCE_NAME
-          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/postgres?sslmode=disable"
+          value: "postgresql://linkding:$(POSTGRES_PASSWORD)@postgres:5432/postgres?sslmode=disable"
+        volumeMounts:
+        - name: exporter-config
+          mountPath: /etc/postgres_exporter.yml
+          subPath: postgres_exporter.yml
         resources:
           requests:
             memory: "32Mi"
@@ -125,6 +129,12 @@ spec:
       - name: postgres-data
         persistentVolumeClaim:
           claimName: postgres-data-pvc
+      - name: exporter-config
+        configMap:
+          name: postgres-exporter-config
+          items:
+          - key: postgres_exporter.yml
+            path: postgres_exporter.yml
 ---
 apiVersion: v1
 kind: Service
