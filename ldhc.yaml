@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ldhc
+  namespace: linkding
+  labels:
+    app: ldhc
+spec:
+  schedule: '0 19 * * 0' # Weekly, Sundays at 8 PM CET (winter) / 9 PM CEST (summer) - matches backup schedule
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid  # Prevent overlapping jobs
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      activeDeadlineSeconds: 3600  # 1 hour timeout
+      template:
+        metadata:
+          labels:
+            app: ldhc
+        spec:
+          serviceAccountName: ldhc
+          securityContext:
+            runAsUser: 1000 # Non-root
+            runAsGroup: 1000
+            runAsNonRoot: true
+            fsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: ldhc
+              image: ghcr.io/sebw/ldhc:0.2.2  # Latest version as of Jan 2025
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: API_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: linkding-api-secret
+                      key: API_TOKEN
+                - name: API_URL
+                  value: 'https://linkding.local/api/bookmarks' # Use your Ingress host; add /?limit=10000 if needed for pagination, but tool handles it
+              resources:
+                requests:
+                  memory: '128Mi'
+                  cpu: '100m'
+                limits:
+                  memory: '512Mi'
+                  cpu: '500m'
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+          restartPolicy: OnFailure

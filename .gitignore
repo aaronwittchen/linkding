@@ -1,4 +1,31 @@
-notes.md
+# Secrets
+secrets.yaml
+linkding-api-secret.yaml
+postgres-tls-secret.yaml
+*.key
+*.crt
+*.pem
+
+# TLS certificates
 tls.key
 tls.crt
-postgres.yaml.save
+*.cert
+
+# Backup files
+*.sql.gz
+backups/
+
+# Local configuration overrides
+local-*.yaml
+*-local.yaml
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db

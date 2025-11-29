@@ -1,0 +1,130 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: linkding-app-policy
+  namespace: linkding
+spec:
+  podSelector:
+    matchLabels:
+      app: linkding
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow ingress from ingress controller (adjust based on your setup)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx # Adjust to your ingress namespace label
+      ports:
+        - protocol: TCP
+          port: 9090
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow connection to PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow outbound HTTPS for fetching webpage metadata/favicons
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+    # Allow outbound HTTP
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-db-policy
+  namespace: linkding
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from Linkding app
+    - from:
+        - podSelector:
+            matchLabels:
+              app: linkding
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow from backup CronJob
+    - from:
+        - podSelector:
+            matchLabels:
+              app: postgres-backup
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow Prometheus scraping of exporter
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring # Adjust to your Prometheus namespace
+      ports:
+        - protocol: TCP
+          port: 9187
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ldhc-cronjob-policy
+  namespace: linkding
+spec:
+  podSelector:
+    matchLabels:
+      app: ldhc
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow connection to Linkding API
+    - to:
+        - podSelector:
+            matchLabels:
+              app: linkding
+      ports:
+        - protocol: TCP
+          port: 9090
+    # Allow HTTPS if accessing via ingress
+    - ports:
+        - protocol: TCP
+          port: 443

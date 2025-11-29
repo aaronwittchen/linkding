@@ -1,0 +1,22 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: linkding
+  namespace: linkding
+  labels:
+    app: linkding
+    release: prom-stack  # Update to match your Prometheus operator release
+spec:
+  selector:
+    matchLabels:
+      app: linkding
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      scheme: http
+  namespaceSelector:
+    matchNames:
+      - linkding
+
