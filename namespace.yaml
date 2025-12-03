@@ -9,4 +9,3 @@ metadata:
     # name: ingress-nginx  # Uncomment if your ingress is in this namespace
     # For monitoring namespace matching
     # name: monitoring  # Uncomment if your Prometheus is in this namespace
-

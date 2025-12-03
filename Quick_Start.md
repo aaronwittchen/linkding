@@ -3,6 +3,7 @@
 ### Install Ingress Controller (If Not Already Installed)
 
 **Check if you already have nginx-ingress**:
+
 ```bash
 kubectl get ingressclass
 ```
@@ -10,6 +11,7 @@ kubectl get ingressclass
 **If you see `nginx` in the output, skip to Step 2.**
 
 **If not, install it**:
+
 ```bash
 # Install nginx-ingress
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.1/deploy/static/provider/cloud/deploy.yaml
@@ -43,6 +45,7 @@ kubectl create secret generic postgres-secret \
 #### 3b. TLS Certificate (For HTTPS)
 
 **Option A: Self-Signed Certificate (For Local Use)**
+
 ```bash
 # Generate self-signed certificate
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
@@ -73,10 +76,12 @@ If you don't need HTTPS, you can skip TLS and modify `ingress.yaml` to remove th
 ### Step 4: Update Configuration Files (If Needed)
 
 **For Local Network Use (linkding.local)**:
+
 - Files are already configured for `linkding.local` - **no changes needed!**
 - Just make sure to add `linkding.local` to your hosts file on devices you want to access from
 
 **To add to hosts file** (on your laptop/other devices):
+
 ```bash
 # Find your server IP
 # On homeserver: hostname -I
@@ -91,6 +96,7 @@ sudo nano /etc/hosts
 ```
 
 **If using a different domain or IP**, update:
+
 - `deploy.yaml` (lines 81, 83) - LD_SERVER_URL and LD_ALLOWED_HOSTS
 - `ingress.yaml` (lines 36, 39) - TLS hosts and rules
 - `ldhc.yaml` (line 42) - API_URL
@@ -193,19 +199,23 @@ kubectl apply -f ldhc.yaml
 ### Step 15: Initial Linkding Setup
 
 1. **Access Linkding**:
+
    - Via `https://linkding.local` (if using local setup with hosts file)
    - Or via NodePort: `kubectl get svc -n ingress-nginx` to find the port
 
 2. **Create Admin User**:
+
    - First time accessing will prompt you to create an admin account
    - Follow the setup wizard
 
 3. **Generate API Token for LDHC**:
+
    - Go to **Settings → API** in Linkding UI
    - Click **"Create Token"** or **"Generate Token"**
    - **Copy the token** (you won't see it again!)
 
 4. **Update the API Token Secret**:
+
    ```bash
    kubectl create secret generic linkding-api-secret \
      --namespace=linkding \
@@ -285,3 +295,93 @@ kubectl port-forward -n linkding svc/linkding 9090:9090
 - Review [PRODUCTION_IMPROVEMENTS.md](./PRODUCTION_IMPROVEMENTS.md) for additional features
 
 - `https://linkding.local`
+
+done
+.gitignore
+deploy.yaml
+
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.1/deploy/static/provider/cloud/deploy.yaml
+kubectl create namespace linkding
+kubectl create secret generic postgres-secret \
+ --namespace=linkding \
+ --from-literal=POSTGRES_USER=linkding \
+ --from-literal=POSTGRES_PASSWORD='123' \
+ --from-literal=POSTGRES_DB=linkding
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+ -keyout tls.key -out tls.crt \
+ -subj "/CN=linkding.local"
+
+kubectl create secret tls linkding-tls \
+ --namespace=linkding \
+ --cert=tls.crt \
+ --key=tls.key
+
+rm tls.key tls.crt
+
+kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
+
+kubectl patch storageclass local-path \
+ -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+
+kubectl label namespace kube-system name=kube-system
+
+# Service Accounts
+
+kubectl apply -f service-accounts.yaml
+
+# ConfigMaps (for postgres exporter)
+
+kubectl apply -f postgres-exporter-config.yaml
+
+# PVCs (persistent storage for Postgres and backups)
+
+kubectl apply -f pvcs.yaml
+
+# PostgreSQL StatefulSet
+
+kubectl apply -f postgres.yaml
+kubectl wait --for=condition=ready pod -l app=postgres -n linkding --timeout=300s
+
+# Deploy Linkding app
+
+kubectl apply -f deploy.yaml
+kubectl wait --for=condition=ready pod -l app=linkding -n linkding --timeout=300s
+
+# Ingress (exposes Linkding)
+
+kubectl apply -f ingress.yaml
+
+# Network policies
+
+kubectl apply -f network-policy.yaml
+
+# Monitoring (if using Prometheus operator)
+
+kubectl apply -f monitoring.yaml
+kubectl apply -f linkding-monitoring.yaml
+
+# LDHC health check CronJob
+
+kubectl apply -f ldhc.yaml
+
+kubectl get pods -n linkding
+kubectl get svc -n linkding
+kubectl get ingress -n linkding
+kubectl get pvc -n linkding
+
+kubectl patch deployment ingress-nginx-controller -n ingress-nginx -p '{"spec":{"template":{"spec":{"hostNetwork":true}}}}'
+
+kubectl exec -it -n linkding linkding-68948fb578-g9mtv -- python manage.py createsuperuser
+
+kubectl label servicemonitor -n linkding postgres-exporter --overwrite release=prometheus
+kubectl label servicemonitor -n linkding linkding --overwrite release=prometheus
+
+kubectl get nodes -o wide
+sudo nano /etc/hosts
+add 192.168.2.207 linkding.local
+
+kubectl label namespace monitoring name=monitoring
+kubectl apply -f linkding-setup/network-policy.yaml
+
+kubectl exec -it -n linkding postgres-0 -- psql -U linkding -d linkding -c "SELECT COUNT(\*) FROM bookmarks_bookmark;"
+kubectl exec -it -n linkding postgres-0 -- psql -U linkding -d linkding -c "SELECT title, url FROM bookmarks_bookmark LIMIT 10;"

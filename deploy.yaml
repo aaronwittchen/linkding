@@ -5,7 +5,7 @@ metadata:
   namespace: linkding
   labels:
     app: linkding
-    version: "1.44.1"
+    version: '1.44.1'
 spec:
   replicas: 2
   strategy:
@@ -20,12 +20,26 @@ spec:
     metadata:
       labels:
         app: linkding
-        version: "1.44.1"
+        version: '1.44.1'
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '9090'
         prometheus.io/path: '/metrics'
     spec:
+      # Force IPv4-only DNS
+      dnsPolicy: None
+      dnsConfig:
+        nameservers:
+          - 10.96.0.10
+        searches:
+          - linkding.svc.cluster.local
+          - svc.cluster.local
+          - cluster.local
+        options:
+          - name: ndots
+            value: '5'
+          - name: single-request-reopen
+
       serviceAccountName: linkding
       securityContext:
         runAsNonRoot: true
@@ -94,7 +108,7 @@ spec:
               cpu: '500m'
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
+            readOnlyRootFilesystem: false
             capabilities:
               drop:
                 - ALL

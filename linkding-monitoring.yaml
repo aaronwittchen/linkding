@@ -5,7 +5,7 @@ metadata:
   namespace: linkding
   labels:
     app: linkding
-    release: prom-stack  # Update to match your Prometheus operator release
+    release: prom-stack
 spec:
   selector:
     matchLabels:
@@ -19,4 +19,3 @@ spec:
   namespaceSelector:
     matchNames:
       - linkding
-

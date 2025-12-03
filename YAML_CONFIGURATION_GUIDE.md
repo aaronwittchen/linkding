@@ -23,32 +23,35 @@ This file defines the main Linkding application deployment, service, and PodDisr
 ### Deployment Resource
 
 #### Metadata and Labels
+
 ```yaml
 metadata:
   name: linkding
   namespace: linkding
   labels:
     app: linkding
-    version: "1.44.1" # v1.44.1 Latest on Oct 11
+    version: '1.44.1' # v1.44.1 Latest on Oct 11
 ```
 
 Labels enable service discovery, monitoring, and network policy matching. The version label helps track which version is deployed.
 
 #### Replicas and High Availability
+
 ```yaml
 spec:
-  replicas: 2  # Increased for High Availability
+  replicas: 2 # Increased for High Availability
 ```
 
 Running 2 replicas provides high availability. If one pod fails or is being updated, the other continues serving traffic. This is essential for production environments where downtime is unacceptable.
 
 #### Rolling Update Strategy
+
 ```yaml
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
 ```
 
 - `maxSurge: 1` - Allows creating 1 extra pod during updates (so you can have 3 pods temporarily)
@@ -57,6 +60,7 @@ Running 2 replicas provides high availability. If one pod fails or is being upda
 This ensures zero-downtime deployments. The application remains fully available even during updates.
 
 #### Service Account
+
 ```yaml
 serviceAccountName: linkding
 ```
@@ -64,10 +68,11 @@ serviceAccountName: linkding
 Instead of using the default service account (which has broad permissions), we use a dedicated service account. This follows the principle of least privilege - the pod only gets permissions it actually needs.
 
 #### Pod Security Context
+
 ```yaml
 securityContext:
   runAsNonRoot: true
-  runAsUser: 33  # www-data
+  runAsUser: 33 # www-data
   runAsGroup: 33
   fsGroup: 33
   seccompProfile:
@@ -82,6 +87,7 @@ securityContext:
 Running as non-root significantly reduces the attack surface. If a container is compromised, the attacker doesn't have root privileges. Seccomp profiles limit what system calls can be made, preventing many attack vectors.
 
 #### Termination Grace Period
+
 ```yaml
 terminationGracePeriodSeconds: 30
 ```
@@ -91,6 +97,7 @@ Gives the container 30 seconds to shut down gracefully when Kubernetes sends a t
 Applications need time to finish processing requests, close database connections, and clean up resources. Without this, Kubernetes might kill the process abruptly, causing data loss or corruption.
 
 #### Pod Anti-Affinity
+
 ```yaml
 affinity:
   podAntiAffinity:
@@ -111,6 +118,7 @@ Tells Kubernetes to prefer scheduling Linkding pods on different nodes.
 If you have multiple nodes, this ensures that if one node fails, the other pod on a different node continues running. This is "preferred" (not required) so Kubernetes can still schedule both pods on the same node if needed, but will try to spread them out.
 
 #### Container Image and Pull Policy
+
 ```yaml
 image: sissbruecker/linkding:1.44.1
 imagePullPolicy: IfNotPresent
@@ -124,6 +132,7 @@ Pinning versions ensures reproducible deployments. You know exactly what version
 #### Environment Variables
 
 ##### Database Configuration
+
 ```yaml
 - name: LD_DB_ENGINE
   value: postgres
@@ -136,6 +145,7 @@ Pinning versions ensures reproducible deployments. You know exactly what version
 These configure Linkding to use PostgreSQL. The host is `postgres` which resolves to the PostgreSQL service in the same namespace via Kubernetes DNS.
 
 ##### Secrets from Kubernetes Secrets
+
 ```yaml
 - name: LD_DB_PASSWORD
   valueFrom:
@@ -149,6 +159,7 @@ Pulls the database password from a Kubernetes Secret instead of hardcoding it.
 Secrets are encrypted at rest and can be managed separately from the deployment. This is a security best practice.
 
 ##### Production Configuration
+
 ```yaml
 - name: LD_SERVER_URL
   value: 'https://linkding.local'
@@ -168,6 +179,7 @@ Secrets are encrypted at rest and can be managed separately from the deployment.
 These are essential for production. Without `LD_SERVER_URL`, Linkding might generate incorrect URLs. `LD_ALLOWED_HOSTS` prevents security vulnerabilities.
 
 #### Resource Limits and Requests
+
 ```yaml
 resources:
   requests:
@@ -186,6 +198,7 @@ resources:
 - This ensures predictable performance and prevents resource exhaustion
 
 #### Container Security Context
+
 ```yaml
 securityContext:
   allowPrivilegeEscalation: false
@@ -204,6 +217,7 @@ These are defense-in-depth security measures. Even if an attacker compromises th
 #### Health Probes
 
 ##### Liveness Probe
+
 ```yaml
 livenessProbe:
   httpGet:
@@ -220,6 +234,7 @@ Checks if the container is still alive. If it fails 3 times, Kubernetes restarts
 If the application hangs or deadlocks, Kubernetes will automatically restart it, improving reliability.
 
 ##### Readiness Probe
+
 ```yaml
 readinessProbe:
   httpGet:
@@ -236,6 +251,7 @@ Checks if the container is ready to receive traffic. If it fails, Kubernetes rem
 Prevents sending traffic to pods that are still starting up or are temporarily unhealthy. This ensures users only hit healthy pods.
 
 ##### Startup Probe
+
 ```yaml
 startupProbe:
   httpGet:
@@ -251,6 +267,7 @@ Gives the container up to 100 seconds (20 × 5) to start before the liveness pro
 Some applications take time to start. Without this, the liveness probe might kill the container before it finishes starting.
 
 #### Volume Mounts
+
 ```yaml
 volumeMounts:
   - name: linkding-data
@@ -286,7 +303,7 @@ spec:
 ```
 
 Creates a stable network endpoint that load balances traffic to all Linkding pods.
- 
+
 - Pods have ephemeral IPs that change on restart
 - The Service provides a stable DNS name (`linkding.linkding.svc.cluster.local`)
 - `ClusterIP` means it's only accessible within the cluster (external access via Ingress)
@@ -319,6 +336,7 @@ This file defines the PostgreSQL database as a StatefulSet (instead of Deploymen
 ### Why StatefulSet Instead of Deployment?
 
 **Deployments** are for stateless applications where pods are interchangeable. **StatefulSets** are for stateful applications where:
+
 - Pods have stable identities (names, hostnames)
 - Storage is persistent and tied to specific pods
 - Pods are created and deleted in order
@@ -328,6 +346,7 @@ This file defines the PostgreSQL database as a StatefulSet (instead of Deploymen
 ### StatefulSet Configuration
 
 #### Service Name
+
 ```yaml
 spec:
   serviceName: postgres
@@ -338,6 +357,7 @@ spec:
 **Why**: StatefulSet pods get predictable DNS names like `postgres-0.postgres.linkding.svc.cluster.local`, which is important for database connections.
 
 #### Volume Claim Templates
+
 ```yaml
 volumeClaimTemplates:
   - metadata:
@@ -357,6 +377,7 @@ volumeClaimTemplates:
 ### PostgreSQL Container
 
 #### Security Context
+
 ```yaml
 securityContext:
   runAsUser: 999
@@ -368,6 +389,7 @@ securityContext:
 **Why**: PostgreSQL runs as user 999 (postgres user) instead of root. This is the standard PostgreSQL user ID.
 
 #### Capabilities
+
 ```yaml
 capabilities:
   drop:
@@ -385,11 +407,12 @@ capabilities:
 **Why**: PostgreSQL needs these specific capabilities to manage file ownership and permissions. We only grant what's necessary.
 
 #### Authentication Configuration
+
 ```yaml
 - name: POSTGRES_INITDB_ARGS
-  value: "--auth-host=scram-sha-256"
+  value: '--auth-host=scram-sha-256'
 - name: POSTGRES_HOST_AUTH_METHOD
-  value: "scram-sha-256"
+  value: 'scram-sha-256'
 ```
 
 **What it does**: Configures PostgreSQL to use SCRAM-SHA-256 authentication instead of the weaker MD5.
@@ -397,6 +420,7 @@ capabilities:
 **Why**: SCRAM-SHA-256 is more secure and is the recommended authentication method for PostgreSQL.
 
 #### Health Probes with pg_isready
+
 ```yaml
 livenessProbe:
   exec:
@@ -422,10 +446,11 @@ livenessProbe:
 **Why**: Enables monitoring of database performance, connection counts, query times, etc. Essential for production observability.
 
 #### Exporter Security
+
 ```yaml
 securityContext:
   runAsNonRoot: true
-  runAsUser: 65534  # nobody
+  runAsUser: 65534 # nobody
   readOnlyRootFilesystem: true
 ```
 
@@ -434,13 +459,14 @@ securityContext:
 ### Services
 
 #### Headless Service
+
 ```yaml
 apiVersion: v1
 kind: Service
 metadata:
   name: postgres
 spec:
-  clusterIP: None  # Headless service
+  clusterIP: None # Headless service
 ```
 
 **What it does**: Creates a headless service (no ClusterIP) that returns individual pod IPs.
@@ -448,6 +474,7 @@ spec:
 **Why**: StatefulSets need headless services to provide stable DNS names for each pod. This is required for StatefulSet functionality.
 
 #### Read Service
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -469,7 +496,7 @@ kind: CronJob
 metadata:
   name: postgres-backup
 spec:
-  schedule: '0 2 * * *'  # 2 AM daily
+  schedule: '0 2 * * *' # 2 AM daily
 ```
 
 **What it does**: Runs a backup job every day at 2 AM.
@@ -479,11 +506,13 @@ spec:
 #### Backup Script Features
 
 ##### Error Handling
+
 ```bash
 set -euo pipefail
 ```
 
-**What it does**: 
+**What it does**:
+
 - `-e` - Exit on any error
 - `-u` - Error on undefined variables
 - `-o pipefail` - Return exit code of failed command in a pipeline
@@ -491,6 +520,7 @@ set -euo pipefail
 **Why**: Ensures the job fails properly if anything goes wrong, allowing Kubernetes to track failures.
 
 ##### Backup Verification
+
 ```bash
 if gzip -t "$BACKUP_FILE" 2>/dev/null; then
   echo "Backup integrity verified"
@@ -506,6 +536,7 @@ fi
 **Why**: A corrupted backup is worse than no backup - it gives false confidence. This catches corruption immediately.
 
 ##### Retention Policy
+
 ```bash
 find "$BACKUP_DIR" -name "linkding_backup_*.sql.gz" -type f -mtime +$BACKUP_RETENTION_DAYS -delete
 ```
@@ -523,8 +554,9 @@ The Ingress resource exposes the Linkding service to the internet through an ing
 ### Security Headers
 
 #### Force SSL Redirect
+
 ```yaml
-nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+nginx.ingress.kubernetes.io/force-ssl-redirect: 'true'
 ```
 
 **What it does**: Automatically redirects HTTP traffic to HTTPS.
@@ -532,9 +564,10 @@ nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 **Why**: Ensures all traffic is encrypted. Critical for protecting user credentials and data.
 
 #### SSL Protocols and Ciphers
+
 ```yaml
-nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
-nginx.ingress.kubernetes.io/ssl-ciphers: "ECDHE-ECDSA-AES128-GCM-SHA256,..."
+nginx.ingress.kubernetes.io/ssl-protocols: 'TLSv1.2 TLSv1.3'
+nginx.ingress.kubernetes.io/ssl-ciphers: 'ECDHE-ECDSA-AES128-GCM-SHA256,...'
 ```
 
 **What it does**: Restricts which TLS versions and cipher suites can be used.
@@ -542,6 +575,7 @@ nginx.ingress.kubernetes.io/ssl-ciphers: "ECDHE-ECDSA-AES128-GCM-SHA256,..."
 **Why**: Disables weak/outdated protocols (TLS 1.0, 1.1) and ciphers that are vulnerable to attacks.
 
 #### Security Headers via Configuration Snippet
+
 ```yaml
 nginx.ingress.kubernetes.io/configuration-snippet: |
   more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload";
@@ -551,6 +585,7 @@ nginx.ingress.kubernetes.io/configuration-snippet: |
 ```
 
 **What each header does**:
+
 - **Strict-Transport-Security (HSTS)**: Tells browsers to always use HTTPS for 1 year
 - **X-Frame-Options: DENY**: Prevents the site from being embedded in iframes (prevents clickjacking)
 - **X-Content-Type-Options: nosniff**: Prevents MIME type sniffing attacks
@@ -563,11 +598,12 @@ nginx.ingress.kubernetes.io/configuration-snippet: |
 ### Rate Limiting
 
 ```yaml
-nginx.ingress.kubernetes.io/limit-rps: "100"
-nginx.ingress.kubernetes.io/limit-connections: "10"
+nginx.ingress.kubernetes.io/limit-rps: '100'
+nginx.ingress.kubernetes.io/limit-connections: '10'
 ```
 
-**What it does**: 
+**What it does**:
+
 - Limits to 100 requests per second per IP
 - Limits to 10 concurrent connections per IP
 
@@ -576,11 +612,11 @@ nginx.ingress.kubernetes.io/limit-connections: "10"
 ### Timeouts and Buffers
 
 ```yaml
-nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
-nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
-nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
-nginx.ingress.kubernetes.io/proxy-body-size: "10m"
-nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+nginx.ingress.kubernetes.io/proxy-connect-timeout: '60'
+nginx.ingress.kubernetes.io/proxy-send-timeout: '60'
+nginx.ingress.kubernetes.io/proxy-read-timeout: '60'
+nginx.ingress.kubernetes.io/proxy-body-size: '10m'
+nginx.ingress.kubernetes.io/proxy-buffer-size: '16k'
 ```
 
 **What it does**: Configures how long nginx waits for connections, sends data, reads responses, and limits request body size.
@@ -610,6 +646,7 @@ Network Policies implement network segmentation and micro-segmentation, controll
 ### Linkding App Policy
 
 #### Ingress Rules
+
 ```yaml
 ingress:
   - from:
@@ -626,6 +663,7 @@ ingress:
 **Why**: Prevents other pods from directly accessing Linkding. Only traffic through the ingress controller is allowed.
 
 #### Egress Rules
+
 ```yaml
 egress:
   - to:
@@ -652,6 +690,7 @@ egress:
 ```
 
 **What it does**: Allows Linkding to:
+
 - Query DNS (kube-system namespace)
 - Connect to PostgreSQL
 - Make outbound HTTP/HTTPS requests (for fetching webpage metadata)
@@ -686,6 +725,7 @@ ingress:
 ```
 
 **What it does**: Only allows:
+
 - Linkding pods to connect to the database
 - Backup jobs to connect to the database
 - Prometheus (in monitoring namespace) to scrape metrics
@@ -716,7 +756,8 @@ metadata:
 
 **What it does**: Creates a service account specifically for Linkding pods.
 
-**Why**: 
+**Why**:
+
 - The default service account has broad permissions
 - Dedicated service accounts allow fine-grained RBAC (Role-Based Access Control)
 - You can grant only the permissions each component needs
@@ -747,7 +788,8 @@ spec:
 
 **What it does**: Requests 1GB of storage that can be mounted by one pod at a time.
 
-**Why**: 
+**Why**:
+
 - `ReadWriteOnce` means only one pod can mount it (sufficient for single-instance or when using shared storage)
 - Persists Linkding's data directory across pod restarts
 - Without this, data would be lost when pods restart
@@ -798,13 +840,14 @@ metadata:
 type: Opaque
 stringData:
   POSTGRES_USER: linkding
-  POSTGRES_PASSWORD: "123"
+  POSTGRES_PASSWORD: '123'
   POSTGRES_DB: linkding
 ```
 
 ### Why Secrets Instead of Environment Variables?
 
 **Security**:
+
 - Secrets are encrypted at rest (if encryption at rest is enabled)
 - Not visible in pod descriptions or environment variable dumps
 - Can be managed separately from deployments
@@ -846,12 +889,14 @@ spec:
 
 **What it does**: Tells Prometheus to scrape metrics from the postgres-exporter sidecar container every 30 seconds.
 
-**Why**: 
+**Why**:
+
 - Enables monitoring of database health, performance, and resource usage
 - Essential for production observability
 - Allows setting up alerts for database issues
 
-**How it works**: 
+**How it works**:
+
 - Prometheus Operator watches for ServiceMonitor resources
 - It automatically configures Prometheus to scrape the endpoints
 - The `release: prom-stack` label tells Prometheus which instance to use (if you have multiple)
@@ -883,7 +928,8 @@ spec:
 
 **What it does**: Configures Prometheus to scrape Linkding's metrics endpoint.
 
-**Why**: 
+**Why**:
+
 - Monitors application health, request rates, response times
 - Enables alerting on application issues
 - Provides metrics for Grafana dashboards
@@ -902,13 +948,14 @@ kind: CronJob
 metadata:
   name: ldhc
 spec:
-  schedule: '0 3 * * 0'  # Weekly, Sundays at 3 AM
+  schedule: '0 3 * * 0' # Weekly, Sundays at 3 AM
   concurrencyPolicy: Forbid
 ```
 
 ### Schedule Format
 
 The schedule uses cron syntax: `minute hour day-of-month month day-of-week`
+
 - `0 3 * * 0` = Every Sunday at 3:00 AM
 - `0 0 * * *` = Every day at midnight
 - `*/30 * * * *` = Every 30 minutes
@@ -926,7 +973,7 @@ concurrencyPolicy: Forbid
 ### Active Deadline
 
 ```yaml
-activeDeadlineSeconds: 3600  # 1 hour timeout
+activeDeadlineSeconds: 3600 # 1 hour timeout
 ```
 
 **What it does**: Kills the job if it runs longer than 1 hour.
@@ -936,10 +983,11 @@ activeDeadlineSeconds: 3600  # 1 hour timeout
 ### Image Version Pinning
 
 ```yaml
-image: ghcr.io/sebw/ldhc:v1.0.0  # Update with actual version
+image: ghcr.io/sebw/ldhc:v1.0.0 # Update with actual version
 ```
 
 **IMPORTANT**: This is a placeholder version. You should:
+
 1. Check what versions are available
 2. Use a specific version instead of `latest`
 3. Update periodically for security patches
@@ -962,6 +1010,7 @@ metadata:
 **What it does**: Creates a namespace to isolate Linkding resources from other applications.
 
 **Why**:
+
 - **Isolation**: Resources in different namespaces are isolated
 - **Organization**: Groups related resources together
 - **Access Control**: RBAC can be applied per-namespace
@@ -971,6 +1020,7 @@ metadata:
 ### Namespace Labels
 
 The labels on the namespace are used by:
+
 - **Network Policies**: To allow/deny traffic based on namespace
 - **Service Monitors**: To configure Prometheus scraping
 - **RBAC**: For role bindings
@@ -984,6 +1034,7 @@ The labels on the namespace are used by:
 This deployment follows several key production-grade principles:
 
 ### 1. **Security**
+
 - Non-root containers
 - Minimal capabilities
 - Network policies (micro-segmentation)
@@ -992,6 +1043,7 @@ This deployment follows several key production-grade principles:
 - TLS encryption
 
 ### 2. **Reliability**
+
 - Multiple replicas
 - Health probes
 - Pod disruption budgets
@@ -999,27 +1051,30 @@ This deployment follows several key production-grade principles:
 - Backup and recovery
 
 ### 3. **Observability**
+
 - Health probes
 - Metrics endpoints
 - ServiceMonitors for Prometheus
 - Structured logging
 
 ### 4. **Maintainability**
+
 - Version pinning
 - Clear labeling
 - Documentation
 - Separation of concerns
 
 ### 5. **Performance**
+
 - Resource limits
 - Rate limiting
 - Proper timeouts
 - Efficient storage
 
 ### 6. **Scalability**
+
 - Horizontal scaling (multiple replicas)
 - Resource requests/limits
 - Pod anti-affinity
 
 Each configuration decision serves one or more of these principles, creating a robust, secure, and maintainable production deployment.
-

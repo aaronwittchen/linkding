@@ -10,5 +10,5 @@ spec:
     matchLabels:
       app: postgres
   endpoints:
-  - port: exporter
-    interval: 30s
+    - port: exporter
+      interval: 30s

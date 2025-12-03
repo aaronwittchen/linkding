@@ -29,7 +29,7 @@ spec:
         fsGroup: 999
         seccompProfile:
           type: RuntimeDefault
-      terminationGracePeriodSeconds: 60  # Give postgres time to shut down gracefully
+      terminationGracePeriodSeconds: 60 # Give postgres time to shut down gracefully
       containers:
         - name: postgres
           image: postgres:16-alpine
@@ -58,9 +58,9 @@ spec:
               value: /var/lib/postgresql/data/pgdata
             # PostgreSQL performance tuning
             - name: POSTGRES_INITDB_ARGS
-              value: "--auth-host=scram-sha-256"
+              value: '--auth-host=scram-sha-256'
             - name: POSTGRES_HOST_AUTH_METHOD
-              value: "scram-sha-256"
+              value: 'scram-sha-256'
           resources:
             requests:
               memory: '256Mi'
@@ -70,7 +70,7 @@ spec:
               cpu: '500m'
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false  # PostgreSQL needs write access
+            readOnlyRootFilesystem: false # PostgreSQL needs write access
             capabilities:
               drop:
                 - ALL
@@ -150,7 +150,7 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             runAsNonRoot: true
-            runAsUser: 65534  # nobody
+            runAsUser: 65534 # nobody
             runAsGroup: 65534
             capabilities:
               drop:
@@ -185,7 +185,6 @@ spec:
         resources:
           requests:
             storage: 5Gi
-        # storageClassName: fast-ssd  # Uncomment and set your storage class
 ---
 apiVersion: v1
 kind: Service
@@ -196,7 +195,7 @@ metadata:
     app: postgres
 spec:
   type: ClusterIP
-  clusterIP: None  # Headless service for StatefulSet
+  clusterIP: None
   selector:
     app: postgres
   ports:
@@ -232,7 +231,7 @@ metadata:
   name: postgres-backup
   namespace: linkding
 spec:
-  schedule: '0 19 * * *'  # 8 PM CET (winter) / 9 PM CEST (summer) - Good time for backups after peak hours
+  schedule: '0 19 * * *' # 8 PM CET (winter) / 9 PM CEST (summer) - Good time for backups after peak hours
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
   jobTemplate:
@@ -271,7 +270,7 @@ spec:
                 - name: POSTGRES_HOST
                   value: postgres-read
                 - name: BACKUP_RETENTION_DAYS
-                  value: "7"  # Keep 7 days of backups
+                  value: '7' # Keep 7 days of backups
               command:
                 - /bin/sh
                 - -c
@@ -281,7 +280,7 @@ spec:
                   mkdir -p "$BACKUP_DIR"
                   TIMESTAMP=$(date +%Y%m%d_%H%M%S)
                   BACKUP_FILE="$BACKUP_DIR/linkding_backup_$TIMESTAMP.sql.gz"
-                  
+
                   echo "Starting backup at $(date)"
                   if pg_dump -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" | gzip > "$BACKUP_FILE"; then
                     BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
@@ -305,7 +304,7 @@ spec:
                   fi
               securityContext:
                 allowPrivilegeEscalation: false
-                readOnlyRootFilesystem: false  # Need to write backups
+                readOnlyRootFilesystem: false # Need to write backups
                 capabilities:
                   drop:
                     - ALL
@@ -331,7 +330,7 @@ metadata:
   name: postgres-pdb
   namespace: linkding
 spec:
-  minAvailable: 0  # Allow disruption since we only have 1 replica
+  minAvailable: 0 # Allow disruption since we only have 1 replica
   selector:
     matchLabels:
       app: postgres

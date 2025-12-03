@@ -5,6 +5,7 @@ postgres-tls-secret.yaml
 *.key
 *.crt
 *.pem
+.env
 
 # TLS certificates
 tls.key

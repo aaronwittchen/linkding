@@ -1,6 +1,3 @@
-# Note: postgres-data-pvc is now managed by StatefulSet volumeClaimTemplates
-# This PVC is kept for reference/migration purposes
-# If you're migrating from Deployment to StatefulSet, you may need to handle the existing PVC
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -10,7 +7,6 @@ metadata:
   labels:
     app: postgres-backup
   annotations:
-    # Add backup annotations if your storage supports it
     # backup.kubernetes.io/backup: "true"
 spec:
   accessModes:
@@ -18,8 +14,6 @@ spec:
   resources:
     requests:
       storage: 2Gi
-  # storageClassName: fast-ssd  # Uncomment and set your storage class
-  # volumeMode: Filesystem
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -34,5 +28,3 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  # storageClassName: fast-ssd  # Uncomment and set your storage class
-  # volumeMode: Filesystem

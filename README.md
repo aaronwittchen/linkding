@@ -27,11 +27,13 @@ Production-grade Kubernetes deployment for [Linkding](https://github.com/sissbru
 **DO NOT commit secrets to Git!**
 
 1. Copy the template:
+
    ```bash
    cp secrets.yaml.template secrets.yaml
    ```
 
 2. Edit `secrets.yaml` with your actual values, OR create secrets directly:
+
    ```bash
    kubectl create secret generic postgres-secret \
      --namespace=linkding \
@@ -76,19 +78,23 @@ See [DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md) for complete setup inst
 Before deploying, update:
 
 1. **Domain names** in:
+
    - `deploy.yaml` (LD_SERVER_URL, LD_ALLOWED_HOSTS)
    - `ingress.yaml` (host)
    - `ldhc.yaml` (API_URL)
 
 2. **Storage classes** (if needed) in:
+
    - `postgres.yaml` (volumeClaimTemplates)
    - `pvcs.yaml`
 
 3. **Namespace labels** in:
+
    - `namespace.yaml`
    - `network-policy.yaml`
 
 4. **Prometheus release label** in:
+
    - `monitoring.yaml`
    - `linkding-monitoring.yaml`
 
@@ -108,6 +114,7 @@ For a **fresh PostgreSQL setup**, no migration is needed - the StatefulSet will 
 This deployment includes [LDHC](https://github.com/sebw/linkding-healthcheck) - a tool that automatically checks your bookmarks for broken links and duplicates.
 
 **Features:**
+
 - Checks all bookmarks for broken links (404, 403, DNS errors, etc.)
 - Tags broken links with `@HEALTH_HTTP_<code>`, `@HEALTH_DNS`, or `@HEALTH_other`
 - Finds duplicate bookmarks
@@ -116,6 +123,7 @@ This deployment includes [LDHC](https://github.com/sebw/linkding-healthcheck) - 
 
 **Setup Required:**
 After deploying Linkding, you need to generate an API token:
+
 1. Access Linkding UI → Settings → API
 2. Generate a new API token
 3. Update the secret:
@@ -159,4 +167,3 @@ This deployment configuration is provided as-is for use with Linkding.
 
 - [Linkding](https://github.com/sissbruecker/linkding) - The bookmark service
 - [LDHC (Linkding Health Check)](https://github.com/sebw/linkding-healthcheck) - Checks bookmarks for broken links and duplicates
-

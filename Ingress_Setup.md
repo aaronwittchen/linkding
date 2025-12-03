@@ -3,6 +3,7 @@
 ## What is an Ingress Controller?
 
 An Ingress Controller is a component that exposes your Kubernetes services to the outside world. It handles:
+
 - Routing traffic from the internet to your pods
 - HTTPS/TLS termination (SSL certificates)
 - Load balancing
@@ -41,6 +42,7 @@ kubectl get ingressclass
 ```
 
 Expected output:
+
 ```
 NAME     CONTROLLER             PARAMETERS   AGE
 nginx    k8s.io/ingress-nginx   <none>       1m
@@ -53,10 +55,12 @@ Since you have a single-node cluster, you have a few options:
 ### Option A: NodePort (Simplest for Local)
 
 The ingress controller will use NodePort, which means you can access it via:
+
 - `http://<your-server-ip>:<nodeport>`
 - Or configure your router to forward port 80/443 to your server
 
 Find the NodePort:
+
 ```bash
 kubectl get svc -n ingress-nginx
 ```
@@ -81,6 +85,7 @@ helm install ingress-nginx ingress-nginx/ingress-nginx \
 ### Option C: LoadBalancer (If You Have One)
 
 If you have a load balancer (like MetalLB), you can use:
+
 ```bash
 --set controller.service.type=LoadBalancer
 ```
@@ -91,7 +96,7 @@ Your `ingress.yaml` is already configured for nginx:
 
 ```yaml
 spec:
-  ingressClassName: nginx  # This matches nginx-ingress
+  ingressClassName: nginx # This matches nginx-ingress
 ```
 
 **No changes needed!** Just make sure nginx-ingress is installed.
@@ -101,11 +106,13 @@ spec:
 After installing nginx-ingress and deploying Linkding:
 
 1. **Check ingress status**:
+
    ```bash
    kubectl get ingress -n linkding
    ```
 
 2. **Check nginx logs** (if issues):
+
    ```bash
    kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller
    ```

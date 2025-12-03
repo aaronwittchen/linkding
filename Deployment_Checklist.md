@@ -11,6 +11,7 @@ This guide walks you through deploying Linkding from GitHub to your homeserver w
 **You need an ingress controller installed** for the Ingress resource to work. The easiest option is **nginx-ingress**.
 
 **Quick Install**:
+
 ```bash
 # Install nginx-ingress (one command)
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.1/deploy/static/provider/cloud/deploy.yaml
@@ -32,7 +33,7 @@ Create secrets locally on your homeserver:
 kubectl create secret generic postgres-secret \
   --namespace=linkding \
   --from-literal=POSTGRES_USER=linkding \
-  --from-literal=POSTGRES_PASSWORD='<generate-strong-password>' \
+  --from-literal=POSTGRES_PASSWORD='123' \
   --from-literal=POSTGRES_DB=linkding
 
 # Generate a strong password (example):
@@ -72,10 +73,18 @@ kubectl get storageclass
 ```
 
 If you have a specific storage class (e.g., `fast-ssd`, `local-path`), uncomment and update in:
+
 - `postgres.yaml` (volumeClaimTemplates section)
 - `pvcs.yaml` (both PVCs)
 
 If no storage class is specified, Kubernetes will use the default.
+
+kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
+
+kubectl patch storageclass local-path \
+ -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+
+kubectl get storageclass
 
 ### 5. **Namespace Labels**
 
@@ -92,6 +101,7 @@ metadata:
 ```
 
 **Check your namespaces**:
+
 ```bash
 kubectl get namespaces --show-labels
 ```
@@ -107,9 +117,10 @@ kubectl get ingressclass
 ```
 
 Update `ingress.yaml` if needed:
+
 ```yaml
 spec:
-  ingressClassName: nginx  # Change if different
+  ingressClassName: nginx # Change if different
 ```
 
 ### 7. **Prometheus Operator Labels**
@@ -121,10 +132,9 @@ kubectl get prometheus -A
 ```
 
 Update the `release` label in:
+
 - `monitoring.yaml`
 - `linkding-monitoring.yaml`
-
-
 
 Check available versions at: https://github.com/sebw/ldhc/releases
 
@@ -169,6 +179,7 @@ kubectl create secret tls linkding-tls \
 ### Step 4: Update Configuration Files
 
 Edit these files with your actual values:
+
 - `deploy.yaml` - Update domain names
 - `ingress.yaml` - Update domain and ingress class
 - `ldhc.yaml` - Update domain and image version
@@ -204,6 +215,7 @@ kubectl apply -f postgres.yaml
 ```
 
 **Wait for PostgreSQL to be ready**:
+
 ```bash
 kubectl wait --for=condition=ready pod -l app=postgres -n linkding --timeout=300s
 ```
@@ -248,6 +260,7 @@ kubectl get pods -n linkding
 ```
 
 You should see:
+
 - `postgres-0` - Running
 - `linkding-xxxxx` - 2 pods running
 
@@ -264,6 +277,7 @@ kubectl get pvc -n linkding
 ```
 
 You should see:
+
 - `postgres-data-postgres-0` (created by StatefulSet)
 - `postgres-backup-pvc`
 - `linkding-data-pvc`
@@ -316,6 +330,7 @@ The backup CronJob will work automatically:
 4. **Verification**: Automatically verifies backup integrity
 
 **Verify backup is working**:
+
 ```bash
 # Check backup job history
 kubectl get jobs -n linkding -l app=postgres-backup
@@ -336,9 +351,9 @@ kubectl exec -n linkding postgres-0 -c backup -- ls -lh /var/lib/postgresql/back
 1. Access Linkding via your domain (or `https://linkding.local` if using local setup)
 2. Create your first admin user
 3. **Generate API Token for LDHC (Linkding Health Check)**:
-   
+
    LDHC is included to automatically check your bookmarks for broken links. You need to set up the API token:
-   
+
    - Go to Linkding UI → **Settings → API**
    - Click **"Create Token"** or **"Generate Token"**
    - Copy the generated token
@@ -349,24 +364,26 @@ kubectl exec -n linkding postgres-0 -c backup -- ls -lh /var/lib/postgresql/back
        --from-literal=API_TOKEN='<paste-your-token-here>' \
        --dry-run=client -o yaml | kubectl apply -f -
      ```
-   
+
    **What LDHC Does:**
+
    - Checks all bookmarks weekly for broken links (404, 403, DNS errors, etc.)
    - Tags broken links with `@HEALTH_HTTP_<code>`, `@HEALTH_DNS`, or `@HEALTH_other`
    - Finds duplicate bookmarks
    - Automatically removes health tags when sites come back online
-   
+
    **Repository**: [sebw/linkding-healthcheck](https://github.com/sebw/linkding-healthcheck)
-   
+
    The LDHC CronJob runs weekly on Sundays at 8/9 PM CET and will automatically start working once the API token is configured.
 
 ### Monitoring Setup
 
 1. Verify Prometheus is scraping metrics:
+
    ```bash
    # Check ServiceMonitor
    kubectl get servicemonitor -n linkding
-   
+
    # Check if Prometheus discovered it
    # (check Prometheus UI -> Status -> Targets)
    ```
@@ -434,4 +451,3 @@ echo "Deployment complete! Check status with: kubectl get pods -n $NAMESPACE"
 ```
 
 Save this as `deploy.sh`, make it executable (`chmod +x deploy.sh`), update the variables, and run it.
-
