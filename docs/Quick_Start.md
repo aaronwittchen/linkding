@@ -296,10 +296,6 @@ kubectl port-forward -n linkding svc/linkding 9090:9090
 
 - `https://linkding.local`
 
-done
-.gitignore
-deploy.yaml
-
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.1/deploy/static/provider/cloud/deploy.yaml
 kubectl create namespace linkding
 kubectl create secret generic postgres-secret \
@@ -340,12 +336,10 @@ kubectl apply -f pvcs.yaml
 # PostgreSQL StatefulSet
 
 kubectl apply -f postgres.yaml
-kubectl wait --for=condition=ready pod -l app=postgres -n linkding --timeout=300s
 
 # Deploy Linkding app
 
 kubectl apply -f deploy.yaml
-kubectl wait --for=condition=ready pod -l app=linkding -n linkding --timeout=300s
 
 # Ingress (exposes Linkding)
 
