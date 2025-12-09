@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-###############################################
 # Full Linkding Backup Script (DB + Files)
-###############################################
-
-# -------- CONFIGURATION --------
 
 # Kubernetes namespace
 NAMESPACE="linkding"
@@ -27,7 +22,7 @@ LINKDING_DATA="/opt/linkding/data"
 # How many old backups to keep
 RETENTION_COUNT=7
 
-# -------- INTERNAL --------
+# INTERNAL
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 WORK_DIR="$BACKUP_DIR/tmp_$TIMESTAMP"
 FINAL_ARCHIVE="$BACKUP_DIR/linkding_full_backup_$TIMESTAMP.tar.gz"
@@ -41,11 +36,7 @@ echo " Timestamp: $TIMESTAMP"
 echo " Work directory: $WORK_DIR"
 echo "============================================="
 
-
-###############################################
 # Step 1 — PostgreSQL Backup via Kubernetes
-###############################################
-
 echo "➤ Finding PostgreSQL pod..."
 DB_POD=$(kubectl get pod -n $NAMESPACE -l $POSTGRES_LABEL -o jsonpath='{.items[0].metadata.name}')
 
@@ -58,11 +49,7 @@ kubectl exec -n $NAMESPACE "$DB_POD" -- \
 
 echo "   ✓ Database backup completed."
 
-
-###############################################
 # Step 2 — Backup Linkding config/data folders
-###############################################
-
 echo "➤ Backing up Linkding config and data files..."
 
 if [ -d "$LINKDING_CONFIG" ]; then
@@ -79,40 +66,23 @@ else
     echo "   ⚠ Data folder not found: $LINKDING_DATA"
 fi
 
-
-###############################################
 # Step 3 — Build the final tar.gz archive
-###############################################
-
 echo "➤ Creating final archive..."
 
 tar -czf "$FINAL_ARCHIVE" -C "$WORK_DIR" .
 
 echo "   ✓ Archive created: $FINAL_ARCHIVE"
 
-
-###############################################
 # Step 4 — Cleanup work directory
-###############################################
-
 rm -rf "$WORK_DIR"
 echo "➤ Temp files cleaned."
 
-
-###############################################
 # Step 5 — Rotate old backups
-###############################################
-
 echo "➤ Applying retention policy (keep last $RETENTION_COUNT backups)..."
 
 ls -1t "$BACKUP_DIR"/linkding_full_backup_*.tar.gz | tail -n +$((RETENTION_COUNT+1)) | xargs -r rm --
 
 echo "   ✓ Old backups cleaned."
-
-
-###############################################
-# DONE
-###############################################
 
 echo "============================================="
 echo " LINKDING FULL BACKUP COMPLETED SUCCESSFULLY "

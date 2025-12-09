@@ -8,7 +8,7 @@ metadata:
     nginx.ingress.kubernetes.io/ssl-protocols: 'TLSv1.2 TLSv1.3'
     nginx.ingress.kubernetes.io/ssl-ciphers: 'ECDHE-ECDSA-AES128-GCM-SHA256,ECDHE-RSA-AES128-GCM-SHA256,ECDHE-ECDSA-AES256-GCM-SHA384,ECDHE-RSA-AES256-GCM-SHA384'
 
-    # --- Security Headers (snippet-free replacements) ---
+    # Security Headers
     nginx.ingress.kubernetes.io/hsts: 'true'
     nginx.ingress.kubernetes.io/hsts-max-age: '31536000'
     nginx.ingress.kubernetes.io/hsts-include-subdomains: 'true'
@@ -18,22 +18,22 @@ metadata:
     nginx.ingress.kubernetes.io/x-content-type-options: 'nosniff'
     nginx.ingress.kubernetes.io/referrer-policy: 'strict-origin-when-cross-origin'
 
-    # --- Rate limiting ---
+    # Rate limiting
     nginx.ingress.kubernetes.io/limit-rps: '100'
     nginx.ingress.kubernetes.io/limit-connections: '10'
 
-    # --- Timeouts ---
+    # Timeouts
     nginx.ingress.kubernetes.io/proxy-connect-timeout: '60'
     nginx.ingress.kubernetes.io/proxy-send-timeout: '60'
     nginx.ingress.kubernetes.io/proxy-read-timeout: '60'
 
-    # --- Body size ---
+    # Body size
     nginx.ingress.kubernetes.io/proxy-body-size: '10m'
 
-    # --- CORS ---
+    # CORS
     nginx.ingress.kubernetes.io/enable-cors: 'false'
 
-    # --- Buffer size ---
+    # Buffer size
     nginx.ingress.kubernetes.io/proxy-buffer-size: '16k'
 spec:
   ingressClassName: nginx

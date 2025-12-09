@@ -2,14 +2,12 @@
 
 [![README lint](https://github.com/aaronwittchen/linkding-setup/actions/workflows/readme-lint.yaml/badge.svg)](https://github.com/aaronwittchen/linkding-setup/actions/workflows/readme-lint.yaml)
 
-Production-grade Kubernetes deployment for
-[Linkding](https://github.com/sissbruecker/linkding) - a self-hosted bookmark service.
+Production-grade Kubernetes deployment for [Linkding](https://github.com/sissbruecker/linkding) - a self-hosted bookmark service.
 
 ## Quick Start
 
-**For instructions**, see [Quick_Start.md](./Quick_Start.md).
-**For detailed information**, see
-[Deployment_Checklist.md](./Deployment_Checklist.md).
+For **instructions**, see [Quick_Start.md](./Quick_Start.md).
+For **detailed information**, see [Deployment_Checklist.md](./Deployment_Checklist.md).
 
 ### Quick Overview
 
@@ -53,43 +51,41 @@ Production-grade Kubernetes deployment for
    openssl rand -base64 32
    ```
 
-See [DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md) for complete
-setup instructions.
+See [Deployment_Checklist.md](./Deployment_Checklist.md) for complete setup instructions.
 
 ## File Structure
 
-- `deploy.yaml` - Linkding application deployment
-- `postgres.yaml` - PostgreSQL StatefulSet with monitoring and backups
-- `ingress.yaml` - Ingress configuration with security headers
-- `network-policy.yaml` - Network security policies
-- `service-accounts.yaml` - Service account definitions
-- `pvcs.yaml` - Persistent volume claims
-- `monitoring.yaml` - PostgreSQL monitoring (ServiceMonitor)
-- `linkding-monitoring.yaml` - Application monitoring (ServiceMonitor)
-- `ldhc.yaml` - Linkding Health Check CronJob
-- `namespace.yaml` - Namespace definition
-- `postgres-exporter-config.yaml` - PostgreSQL exporter configuration
+| File                          | Description                                        |
+| ----------------------------- | -------------------------------------------------- |
+| backup_linkding.sh            | Script to backup Linkding data                     |
+| deploy.yaml                   | Linkding application deployment                    |
+| ingress.yaml                  | Ingress configuration with security headers        |
+| ldhc.yaml                     | Linkding Health Check CronJob                      |
+| linkding-monitoring.yaml      | Application monitoring (ServiceMonitor)            |
+| monitoring.yaml               | PostgreSQL monitoring (ServiceMonitor)             |
+| network-policy.yaml           | Network security policies                          |
+| postgres-exporter-config.yaml | PostgreSQL exporter configuration                  |
+| postgres.yaml                 | PostgreSQL StatefulSet with monitoring and backups |
+| pvcs.yaml                     | Persistent volume claims                           |
+| service-accounts.yaml         | Service account definitions                        |
+| restore_linkding.sh           | Script to restore Linkding data                    |
 
 ## Documentation
 
-- **[QUICK_START.md](./QUICK_START.md)** - Step-by-step guide after
-  pulling files (START HERE!)
-- **[DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md)** - Complete
-  deployment guide with details
-- **[YAML_CONFIGURATION_GUIDE.md](./YAML_CONFIGURATION_GUIDE.md)** -
-  Detailed explanation of all configurations
-- **[PRODUCTION_IMPROVEMENTS.md](./PRODUCTION_IMPROVEMENTS.md)** -
-  Overview of production-grade features
-- **[POSTGRES_MIGRATION.md](./POSTGRES_MIGRATION.md)** - PostgreSQL
-  StatefulSet migration guide
-- **[INGRESS_SETUP.md](./INGRESS_SETUP.md)** - Ingress controller
-  installation guide
-- **[LOCAL_SETUP_GUIDE.md](./LOCAL_SETUP_GUIDE.md)** - Local network
-  setup (no public domain needed)
+| File                        | Description                                          |
+| --------------------------- | ---------------------------------------------------- |
+| Backup_And_Restore.md       | Instructions for backup and restore procedures       |
+| Database_Operations.md      | PostgreSQL database operations guide                 |
+| Deployment_Checklist.md     | Complete deployment guide with details               |
+| Ingress_Setup.md            | Ingress controller installation guide                |
+| Monitoring_Guide.md         | Linkding and PostgreSQL monitoring guide             |
+| Quick_Start.md              | Step-by-step guide after pulling files (START HERE!) |
+| Workflow_Setup.md           | Explanations on different GitHub workflows           |
+| Yaml_Configuration_Guide.md | Detailed explanation of all configurations           |
 
 ## Configuration
 
-Before deploying, update:
+**Before deploying, update:**
 
 1. **Domain names** in:
 
@@ -118,24 +114,19 @@ Before deploying, update:
 ## Database and Backups
 
 - **PostgreSQL**: Deployed as StatefulSet with persistent storage
-- **Backups**: Automated daily backups at 8/9 PM CET with 7-day
-  retention
+- **Backups**: Automated daily backups at 8/9 PM CET with 7-day retention
 - **Storage**: Automatic PVC creation via volumeClaimTemplates
 
-For a **fresh PostgreSQL setup**, no migration is needed - the
-StatefulSet will create everything automatically.
+For a **fresh PostgreSQL setup**, no migration is needed - the StatefulSet will create everything automatically.
 
 ## Linkding Health Check (LDHC)
 
-This deployment includes
-[LDHC](https://github.com/sebw/linkding-healthcheck) - a tool that
-automatically checks your bookmarks for broken links and duplicates.
+This deployment includes [LDHC](https://github.com/sebw/linkding-healthcheck) - a tool that automatically checks your bookmarks for broken links and duplicates.
 
 **Features:**
 
 - Checks all bookmarks for broken links (404, 403, DNS errors, etc.)
-- Tags broken links with `@HEALTH_HTTP_<code>`, `@HEALTH_DNS`, or
-  `@HEALTH_other`
+- Tags broken links with `@HEALTH_HTTP_<code>`, `@HEALTH_DNS`, or `@HEALTH_other`
 - Finds duplicate bookmarks
 - Automatically removes health tags when sites come back online
 - Runs weekly on Sundays at 8/9 PM CET
@@ -154,8 +145,7 @@ After deploying Linkding, you need to generate an API token:
      --dry-run=client -o yaml | kubectl apply -f -
    ```
 
-The LDHC CronJob will then automatically run weekly to check your
-bookmarks.
+The LDHC CronJob will then automatically run weekly to check your bookmarks.
 
 ## Security Features
 
@@ -175,10 +165,8 @@ bookmarks.
 
 ## Important Notes
 
-1. **Secrets**: Never commit `secrets.yaml` to Git. Use the template or
-   create secrets via kubectl.
-2. **TLS Certificates**: Generate or use cert-manager for automatic
-   certificates.
+1. **Secrets**: Never commit `secrets.yaml` to Git. Use the template or create secrets via kubectl.
+2. **TLS Certificates**: Generate or use cert-manager for automatic certificates.
 3. **Storage**: Ensure your cluster has a storage class configured.
 4. **Domain**: Update all domain references before deploying.
 
@@ -188,8 +176,5 @@ This deployment configuration is provided as-is for use with Linkding.
 
 ## Credits
 
-- [Linkding](https://github.com/sissbruecker/linkding) - The bookmark
-  service
-- [LDHC (Linkding Health
-  Check)](https://github.com/sebw/linkding-healthcheck) - Checks
-  bookmarks for broken links and duplicates
+- [Linkding](https://github.com/sissbruecker/linkding) - The bookmark service
+- [LDHC (Linkding Health Check)](https://github.com/sebw/linkding-healthcheck) - Checks bookmarks for broken links and duplicates
