@@ -10,10 +10,12 @@ resources:
   - postgres-config.yaml
   - postgres.yaml
   - deployment.yaml
-  - ingress.yaml
+  - httproute.yaml
 
-commonLabels:
-  app.kubernetes.io/part-of: linkding
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: linkding
+    includeSelectors: false
 
 images:
   - name: sissbruecker/linkding

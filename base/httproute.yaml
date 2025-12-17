@@ -1,0 +1,23 @@
+# Gateway API HTTPRoute for Linkding
+# Requires Gateway API and Envoy Gateway installed
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: linkding
+  namespace: linkding
+  labels:
+    app: linkding
+spec:
+  parentRefs:
+    - name: eg
+      namespace: envoy-gateway-system
+  hostnames:
+    - "linkding.k8s.home"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: linkding
+          port: 9090
