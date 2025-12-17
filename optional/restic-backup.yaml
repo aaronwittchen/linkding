@@ -1,0 +1,211 @@
+# Restic Backup for Linkding
+# Backs up PostgreSQL database and linkding data to a restic repository
+#
+# Prerequisites:
+# 1. Create the restic secret (see below)
+# 2. Initialize restic repo: restic init
+# 3. Have a backup destination (local path, S3, SFTP, etc.)
+#
+# Create secret:
+#   kubectl create secret generic restic-secret -n linkding \
+#     --from-literal=RESTIC_PASSWORD='your-restic-password' \
+#     --from-literal=RESTIC_REPOSITORY='/backups/linkding' \
+#     --from-literal=AWS_ACCESS_KEY_ID='optional-for-s3' \
+#     --from-literal=AWS_SECRET_ACCESS_KEY='optional-for-s3'
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: restic-cache-pvc
+  namespace: linkding
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: restic-backup
+  namespace: linkding
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: restic-backup
+  namespace: linkding
+spec:
+  schedule: '0 4 * * *'  # 4 AM daily
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 3600  # 1 hour timeout
+      template:
+        metadata:
+          labels:
+            app: restic-backup
+        spec:
+          serviceAccountName: restic-backup
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+          restartPolicy: OnFailure
+
+          initContainers:
+            # Dump PostgreSQL database first
+            - name: pg-dump
+              image: postgres:16-alpine
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: postgres-secret
+                      key: POSTGRES_PASSWORD
+                - name: POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: postgres-secret
+                      key: POSTGRES_USER
+                - name: POSTGRES_DB
+                  valueFrom:
+                    secretKeyRef:
+                      name: postgres-secret
+                      key: POSTGRES_DB
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "Dumping PostgreSQL database..."
+                  pg_dump -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+                    --format=custom --compress=6 \
+                    -f /backup-staging/linkding.dump
+                  echo "Database dump complete: $(du -h /backup-staging/linkding.dump)"
+              volumeMounts:
+                - name: backup-staging
+                  mountPath: /backup-staging
+              resources:
+                requests:
+                  memory: '128Mi'
+                  cpu: '100m'
+                limits:
+                  memory: '256Mi'
+                  cpu: '200m'
+
+          containers:
+            - name: restic
+              image: restic/restic:0.16.2
+              env:
+                - name: RESTIC_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: restic-secret
+                      key: RESTIC_PASSWORD
+                - name: RESTIC_REPOSITORY
+                  valueFrom:
+                    secretKeyRef:
+                      name: restic-secret
+                      key: RESTIC_REPOSITORY
+                # Uncomment for S3 backend
+                # - name: AWS_ACCESS_KEY_ID
+                #   valueFrom:
+                #     secretKeyRef:
+                #       name: restic-secret
+                #       key: AWS_ACCESS_KEY_ID
+                # - name: AWS_SECRET_ACCESS_KEY
+                #   valueFrom:
+                #     secretKeyRef:
+                #       name: restic-secret
+                #       key: AWS_SECRET_ACCESS_KEY
+                - name: RESTIC_CACHE_DIR
+                  value: /cache
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "=== Restic Backup Started: $(date) ==="
+
+                  # Check if repo exists, init if not
+                  restic snapshots > /dev/null 2>&1 || {
+                    echo "Initializing restic repository..."
+                    restic init
+                  }
+
+                  # Backup database dump
+                  echo "Backing up PostgreSQL dump..."
+                  restic backup /backup-staging/linkding.dump \
+                    --tag postgres \
+                    --tag linkding \
+                    --host linkding-k8s
+
+                  # Backup linkding data (favicons, assets, etc.)
+                  echo "Backing up linkding data..."
+                  restic backup /linkding-data \
+                    --tag linkding-data \
+                    --tag linkding \
+                    --host linkding-k8s
+
+                  # Prune old backups (keep 7 daily, 4 weekly, 6 monthly)
+                  echo "Pruning old backups..."
+                  restic forget \
+                    --keep-daily 7 \
+                    --keep-weekly 4 \
+                    --keep-monthly 6 \
+                    --prune
+
+                  # Show backup stats
+                  echo "=== Backup Summary ==="
+                  restic snapshots --latest 5
+
+                  echo "=== Restic Backup Completed: $(date) ==="
+              volumeMounts:
+                - name: backup-staging
+                  mountPath: /backup-staging
+                  readOnly: true
+                - name: linkding-data
+                  mountPath: /linkding-data
+                  readOnly: true
+                - name: restic-cache
+                  mountPath: /cache
+                - name: restic-repo
+                  mountPath: /backups
+              resources:
+                requests:
+                  memory: '256Mi'
+                  cpu: '100m'
+                limits:
+                  memory: '512Mi'
+                  cpu: '500m'
+
+          volumes:
+            - name: backup-staging
+              emptyDir: {}
+            - name: linkding-data
+              persistentVolumeClaim:
+                claimName: linkding-data-pvc
+            - name: restic-cache
+              persistentVolumeClaim:
+                claimName: restic-cache-pvc
+            - name: restic-repo
+              persistentVolumeClaim:
+                claimName: restic-repo-pvc  # Or use NFS/hostPath for external storage
+---
+# If backing up to local storage, create this PVC
+# For S3/SFTP backends, you don't need this
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: restic-repo-pvc
+  namespace: linkding
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

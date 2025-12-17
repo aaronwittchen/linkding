@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: linkding
+
+resources:
+  - namespace.yaml
+  - service-accounts.yaml
+  - pvcs.yaml
+  - postgres-config.yaml
+  - postgres.yaml
+  - deployment.yaml
+  - ingress.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: linkding
+
+images:
+  - name: sissbruecker/linkding
+    newTag: 1.44.1
+  - name: postgres
+    newTag: 16-alpine

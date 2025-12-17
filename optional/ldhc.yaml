@@ -1,51 +1,57 @@
+# Linkding Health Check (LDHC) CronJob
+# Automatically checks bookmarks for broken links and duplicates
+# Requires linkding-api-secret with API_TOKEN key
+# See: https://github.com/sebw/linkding-healthcheck
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: ldhc
+  name: linkding-healthcheck
   namespace: linkding
   labels:
-    app: ldhc
+    app: linkding-healthcheck
 spec:
-  schedule: '0 19 * * 0' # Weekly, Sundays at 8 PM CET (winter) / 9 PM CEST (summer) - matches backup schedule
+  schedule: '0 20 * * 0'  # Sunday at 8 PM (adjust for your timezone)
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
-  concurrencyPolicy: Forbid # Prevent overlapping jobs
+  concurrencyPolicy: Forbid
   jobTemplate:
     spec:
-      backoffLimit: 3
-      activeDeadlineSeconds: 3600 # 1 hour timeout
       template:
         metadata:
           labels:
-            app: ldhc
+            app: linkding-healthcheck
         spec:
-          serviceAccountName: ldhc
+          serviceAccountName: linkding
           securityContext:
-            runAsUser: 1000 # Non-root
+            runAsUser: 1000
             runAsGroup: 1000
             runAsNonRoot: true
             fsGroup: 1000
-            seccompProfile:
-              type: RuntimeDefault
           containers:
             - name: ldhc
-              image: ghcr.io/sebw/ldhc:0.2.2
-              imagePullPolicy: IfNotPresent
+              image: ghcr.io/sebw/linkding-healthcheck:latest
+              imagePullPolicy: Always
               env:
+                - name: API_URL
+                  value: 'http://linkding:9090'
                 - name: API_TOKEN
                   valueFrom:
                     secretKeyRef:
                       name: linkding-api-secret
                       key: API_TOKEN
-                - name: API_URL
-                  value: 'https://linkding.local/api/bookmarks'
+                - name: CHECK_DUPLICATES
+                  value: 'true'
+                - name: CHECK_URLS
+                  value: 'true'
+                - name: TIMEOUT
+                  value: '10'
               resources:
                 requests:
+                  memory: '64Mi'
+                  cpu: '25m'
+                limits:
                   memory: '128Mi'
                   cpu: '100m'
-                limits:
-                  memory: '512Mi'
-                  cpu: '500m'
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true

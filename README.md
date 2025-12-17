@@ -1,180 +1,256 @@
 # Linkding Kubernetes Deployment
 
-[![README lint](https://github.com/aaronwittchen/linkding-setup/actions/workflows/readme-lint.yaml/badge.svg)](https://github.com/aaronwittchen/linkding-setup/actions/workflows/readme-lint.yaml)
-
 Production-grade Kubernetes deployment for [Linkding](https://github.com/sissbruecker/linkding) - a self-hosted bookmark service.
 
 ## Quick Start
 
-For **instructions**, see [Quick_Start.md](./Quick_Start.md).
-For **detailed information**, see [Deployment_Checklist.md](./Deployment_Checklist.md).
+```bash
+# 1. Create namespace and secrets
+kubectl create namespace linkding
+kubectl create secret generic postgres-secret \
+  --namespace=linkding \
+  --from-literal=POSTGRES_USER=linkding \
+  --from-literal=POSTGRES_PASSWORD="$(openssl rand -base64 32)" \
+  --from-literal=POSTGRES_DB=linkding
 
-### Quick Overview
+# 2. Deploy with Kustomize (choose your storage backend)
+kubectl apply -k overlays/longhorn/    # For Longhorn storage
+# OR
+kubectl apply -k overlays/local-path/  # For local-path storage
 
-1. **Install ingress controller** (nginx-ingress)
-2. **Create secrets** on your homeserver
-3. **Deploy** using kubectl (all YAML files ready to go)
-4. **Set up API token** after first deployment (for LDHC)
+# 3. Verify deployment
+kubectl get pods -n linkding
+```
 
 ## Prerequisites
 
 - Kubernetes cluster (1.24+)
-- kubectl configured to access your cluster
+- kubectl configured
 - Ingress controller (nginx-ingress recommended)
-- Storage class configured (or default available)
-- Prometheus Operator (optional, for monitoring)
+- Storage class (Longhorn or local-path)
+- Kustomize (built into kubectl 1.14+)
+
+## Directory Structure
+
+```
+linkding/
+├── base/                    # Core Kustomize base
+│   ├── kustomization.yaml   # Base configuration
+│   ├── namespace.yaml       # Namespace definition
+│   ├── service-accounts.yaml
+│   ├── postgres-config.yaml # PostgreSQL ConfigMap
+│   ├── pvcs.yaml            # Persistent Volume Claims
+│   ├── postgres.yaml        # PostgreSQL StatefulSet + backup CronJob
+│   ├── deployment.yaml      # Linkding Deployment + Service
+│   └── ingress.yaml         # Nginx Ingress
+│
+├── overlays/                # Environment-specific overlays
+│   ├── longhorn/            # Longhorn storage class
+│   └── local-path/          # Local-path storage class
+│
+├── optional/                # Optional components
+│   ├── kustomization.yaml   # Optional features kustomization
+│   ├── secrets.example.yaml # Secrets template (copy and modify)
+│   ├── network-policy.yaml  # Network security policies
+│   ├── hpa.yaml             # Horizontal Pod Autoscaler
+│   ├── ldhc.yaml            # Linkding Health Check CronJob
+│   ├── monitoring.yaml      # Prometheus ServiceMonitors
+│   └── restic-backup.yaml   # Restic backup integration
+│
+├── docs/                    # Documentation
+│   ├── Quick_Start.md
+│   ├── Deployment_Checklist.md
+│   └── ...
+│
+├── backup_linkding.sh       # Manual backup script
+└── restore_linkding.sh      # Manual restore script
+```
+
+## Deployment Options
+
+### Option 1: Kustomize (Recommended)
+
+```bash
+# Preview what will be deployed
+kubectl kustomize overlays/longhorn/
+
+# Deploy
+kubectl apply -k overlays/longhorn/
+```
+
+### Option 2: Direct Apply
+
+```bash
+# Apply base resources individually
+kubectl apply -f base/namespace.yaml
+kubectl apply -f base/service-accounts.yaml
+kubectl apply -f base/postgres-config.yaml
+kubectl apply -f base/pvcs.yaml
+kubectl apply -f base/postgres.yaml
+kubectl apply -f base/deployment.yaml
+kubectl apply -f base/ingress.yaml
+```
 
 ## Secrets Setup
 
-**DO NOT commit secrets to Git!**
+**Never commit secrets to Git.**
 
-1. Copy the template:
+### Required: PostgreSQL Secret
 
-   ```bash
-   cp secrets.yaml.template secrets.yaml
-   ```
+```bash
+kubectl create secret generic postgres-secret \
+  --namespace=linkding \
+  --from-literal=POSTGRES_USER=linkding \
+  --from-literal=POSTGRES_PASSWORD="$(openssl rand -base64 32)" \
+  --from-literal=POSTGRES_DB=linkding
+```
 
-2. Edit `secrets.yaml` with your actual values, OR create secrets
-   directly:
+### Optional: API Secret (for LDHC)
 
-   ```bash
-   kubectl create secret generic postgres-secret \
-     --namespace=linkding \
-     --from-literal=POSTGRES_USER=linkding \
-     --from-literal=POSTGRES_PASSWORD='<strong-password>' \
-     --from-literal=POSTGRES_DB=linkding
-   ```
+After deploying Linkding, generate an API token in the UI (Settings -> API), then:
 
-3. Generate strong passwords:
+```bash
+kubectl create secret generic linkding-api-secret \
+  --namespace=linkding \
+  --from-literal=API_TOKEN='your-api-token-here'
+```
 
-   ```bash
-   openssl rand -base64 32
-   ```
+### Using Template File
 
-See [Deployment_Checklist.md](./Deployment_Checklist.md) for complete setup instructions.
+```bash
+# Copy template
+cp optional/secrets.example.yaml secrets.yaml
 
-## File Structure
+# Edit with your values
+vim secrets.yaml
 
-| File                          | Description                                        |
-| ----------------------------- | -------------------------------------------------- |
-| backup_linkding.sh            | Script to backup Linkding data                     |
-| deploy.yaml                   | Linkding application deployment                    |
-| ingress.yaml                  | Ingress configuration with security headers        |
-| ldhc.yaml                     | Linkding Health Check CronJob                      |
-| linkding-monitoring.yaml      | Application monitoring (ServiceMonitor)            |
-| monitoring.yaml               | PostgreSQL monitoring (ServiceMonitor)             |
-| network-policy.yaml           | Network security policies                          |
-| postgres-exporter-config.yaml | PostgreSQL exporter configuration                  |
-| postgres.yaml                 | PostgreSQL StatefulSet with monitoring and backups |
-| pvcs.yaml                     | Persistent volume claims                           |
-| service-accounts.yaml         | Service account definitions                        |
-| restore_linkding.sh           | Script to restore Linkding data                    |
+# Apply
+kubectl apply -f secrets.yaml
+```
 
-## Documentation
+## Optional Features
 
-| File                        | Description                                          |
-| --------------------------- | ---------------------------------------------------- |
-| Backup_And_Restore.md       | Instructions for backup and restore procedures       |
-| Database_Operations.md      | PostgreSQL database operations guide                 |
-| Deployment_Checklist.md     | Complete deployment guide with details               |
-| Ingress_Setup.md            | Ingress controller installation guide                |
-| Monitoring_Guide.md         | Linkding and PostgreSQL monitoring guide             |
-| Quick_Start.md              | Step-by-step guide after pulling files (START HERE!) |
-| Workflow_Setup.md           | Explanations on different GitHub workflows           |
-| Yaml_Configuration_Guide.md | Detailed explanation of all configurations           |
+Deploy optional components as needed:
+
+```bash
+# Network policies (micro-segmentation)
+kubectl apply -f optional/network-policy.yaml
+
+# Horizontal Pod Autoscaler
+kubectl apply -f optional/hpa.yaml
+
+# Linkding Health Check (requires API secret)
+kubectl apply -f optional/ldhc.yaml
+
+# Prometheus monitoring (requires Prometheus Operator)
+kubectl apply -f optional/monitoring.yaml
+```
+
+Or deploy all optional features:
+
+```bash
+kubectl apply -k optional/
+```
 
 ## Configuration
 
-**Before deploying, update:**
+### Domain Configuration
 
-1. **Domain names** in:
+Update the domain in these files before deploying:
 
-   - `deploy.yaml` (LD_SERVER_URL, LD_ALLOWED_HOSTS)
-   - `ingress.yaml` (host)
-   - `ldhc.yaml` (API_URL)
+| File | Line | Value |
+|------|------|-------|
+| `base/deployment.yaml` | LD_SERVER_URL | `http://linkding.k8s.home` |
+| `base/deployment.yaml` | LD_ALLOWED_HOSTS | `linkding.k8s.home` |
+| `base/ingress.yaml` | host | `linkding.k8s.home` |
 
-2. **Storage classes** (if needed) in:
+### Storage Classes
 
-   - `postgres.yaml` (volumeClaimTemplates)
-   - `pvcs.yaml`
+The overlays handle storage class configuration:
 
-3. **Namespace labels** in:
+- `overlays/longhorn/` - For Longhorn distributed storage
+- `overlays/local-path/` - For local-path provisioner
 
-   - `namespace.yaml`
-   - `network-policy.yaml`
+### Image Versions
 
-4. **Prometheus release label** in:
+Image versions are pinned in `base/kustomization.yaml`:
 
-   - `monitoring.yaml`
-   - `linkding-monitoring.yaml`
-
-5. **Ingress class** in:
-   - `ingress.yaml`
-
-## Database and Backups
-
-- **PostgreSQL**: Deployed as StatefulSet with persistent storage
-- **Backups**: Automated daily backups at 8/9 PM CET with 7-day retention
-- **Storage**: Automatic PVC creation via volumeClaimTemplates
-
-For a **fresh PostgreSQL setup**, no migration is needed - the StatefulSet will create everything automatically.
+```yaml
+images:
+  - name: sissbruecker/linkding
+    newTag: 1.44.1
+  - name: postgres
+    newTag: 16-alpine
+```
 
 ## Linkding Health Check (LDHC)
 
-This deployment includes [LDHC](https://github.com/sebw/linkding-healthcheck) - a tool that automatically checks your bookmarks for broken links and duplicates.
+[LDHC](https://github.com/sebw/linkding-healthcheck) automatically checks bookmarks for broken links.
 
 **Features:**
-
-- Checks all bookmarks for broken links (404, 403, DNS errors, etc.)
-- Tags broken links with `@HEALTH_HTTP_<code>`, `@HEALTH_DNS`, or `@HEALTH_other`
+- Checks all bookmarks for broken links (404, 403, DNS errors)
+- Tags broken links with `@HEALTH_HTTP_<code>`, `@HEALTH_DNS`, etc.
 - Finds duplicate bookmarks
-- Automatically removes health tags when sites come back online
-- Runs weekly on Sundays at 8/9 PM CET
+- Runs weekly (configurable in `optional/ldhc.yaml`)
 
-**Setup Required:**
-After deploying Linkding, you need to generate an API token:
-
-1. Access Linkding UI → Settings → API
-2. Generate a new API token
-3. Update the secret:
-
-   ```bash
-   kubectl create secret generic linkding-api-secret \
-     --namespace=linkding \
-     --from-literal=API_TOKEN='<your-generated-token>' \
-     --dry-run=client -o yaml | kubectl apply -f -
-   ```
-
-The LDHC CronJob will then automatically run weekly to check your bookmarks.
+**Setup:**
+1. Deploy Linkding
+2. Generate API token in Settings -> API
+3. Create the API secret (see above)
+4. Deploy LDHC: `kubectl apply -f optional/ldhc.yaml`
 
 ## Security Features
 
 - Non-root containers
-- Security contexts and capabilities
-- Network policies (micro-segmentation)
-- TLS encryption
-- Security headers (HSTS, CSP, etc.)
-- Rate limiting
-- Secrets management
+- Security contexts with dropped capabilities
+- Network policies for traffic restriction
+- Read-only root filesystem where possible
+- Secrets managed outside Git
+
+## Database & Backups
+
+- **PostgreSQL**: StatefulSet with persistent storage
+- **Auto Backups**: Daily at 3 AM with 7-day retention
+- **Manual Backup**: `./backup_linkding.sh`
+- **Restore**: `./restore_linkding.sh`
 
 ## Monitoring
 
-- Health probes (liveness, readiness, startup)
-- Prometheus metrics (PostgreSQL exporter + application metrics)
-- ServiceMonitors for automatic scraping
+Requires Prometheus Operator. Deploy ServiceMonitors:
 
-## Important Notes
+```bash
+kubectl apply -f optional/monitoring.yaml
+```
 
-1. **Secrets**: Never commit `secrets.yaml` to Git. Use the template or create secrets via kubectl.
-2. **TLS Certificates**: Generate or use cert-manager for automatic certificates.
-3. **Storage**: Ensure your cluster has a storage class configured.
-4. **Domain**: Update all domain references before deploying.
+## Verification
 
-## License
+```bash
+# Check all resources
+kubectl get all -n linkding
 
-This deployment configuration is provided as-is for use with Linkding.
+# Check pods
+kubectl get pods -n linkding
+
+# Check ingress
+kubectl get ingress -n linkding
+
+# View logs
+kubectl logs -n linkding -l app=linkding
+kubectl logs -n linkding postgres-0
+```
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Deploy.md](docs/Deploy.md) | Complete deployment guide |
+| [Quick_Start.md](docs/Quick_Start.md) | Quick reference for deployment |
+| [Deployment_Checklist.md](docs/Deployment_Checklist.md) | Detailed configuration checklist |
+| [Backup_And_Restore.md](docs/Backup_And_Restore.md) | Backup and restore procedures |
+| [Database_Operations.md](docs/Database_Operations.md) | PostgreSQL operations |
+| [Monitoring_Guide.md](docs/Monitoring_Guide.md) | Prometheus monitoring setup |
 
 ## Credits
 
 - [Linkding](https://github.com/sissbruecker/linkding) - The bookmark service
-- [LDHC (Linkding Health Check)](https://github.com/sebw/linkding-healthcheck) - Checks bookmarks for broken links and duplicates
+- [LDHC](https://github.com/sebw/linkding-healthcheck) - Health check tool

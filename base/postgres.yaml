@@ -15,11 +15,6 @@ spec:
     metadata:
       labels:
         app: postgres
-      annotations:
-        prometheus.io/scrape: 'true'
-        prometheus.io/port: '9187'
-        prometheus.io/path: '/metrics'
-        summary: 'Linkding Postgres Exporter'
     spec:
       serviceAccountName: postgres
       securityContext:
@@ -27,9 +22,7 @@ spec:
         runAsGroup: 999
         runAsNonRoot: true
         fsGroup: 999
-        seccompProfile:
-          type: RuntimeDefault
-      terminationGracePeriodSeconds: 60 # Give postgres time to shut down gracefully
+      terminationGracePeriodSeconds: 60
       containers:
         - name: postgres
           image: postgres:16-alpine
@@ -56,11 +49,12 @@ spec:
                   key: POSTGRES_DB
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
-            # PostgreSQL performance tuning
             - name: POSTGRES_INITDB_ARGS
               value: '--auth-host=scram-sha-256'
             - name: POSTGRES_HOST_AUTH_METHOD
               value: 'scram-sha-256'
+            - name: POSTGRES_CONFIG_FILE
+              value: '/etc/postgresql/postgresql.conf'
           resources:
             requests:
               memory: '256Mi'
@@ -70,7 +64,7 @@ spec:
               cpu: '500m'
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false # PostgreSQL needs write access
+            readOnlyRootFilesystem: false
             capabilities:
               drop:
                 - ALL
@@ -100,82 +94,20 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 3
-          startupProbe:
-            exec:
-              command:
-                - /bin/sh
-                - -c
-                - pg_isready -h localhost -U "$POSTGRES_USER" -d "$POSTGRES_DB"
-            failureThreshold: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
-        - name: postgres-exporter
-          image: prometheuscommunity/postgres-exporter:v0.15.0
-          imagePullPolicy: IfNotPresent
-          args:
-            - --extend.query-path=/tmp/postgres_exporter.yml
-          ports:
-            - containerPort: 9187
-              name: metrics
-              protocol: TCP
-          env:
-            - name: DATA_SOURCE_USER
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-secret
-                  key: POSTGRES_USER
-            - name: DATA_SOURCE_PASS
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-secret
-                  key: POSTGRES_PASSWORD
-            - name: DATA_SOURCE_URI
-              value: 'localhost:5432/linkding?sslmode=disable'
-          volumeMounts:
-            - name: exporter-config
-              mountPath: /tmp/postgres_exporter.yml
-              subPath: postgres_exporter.yml
+            - name: postgres-config
+              mountPath: /etc/postgresql/postgresql.conf
+              subPath: postgresql.conf
               readOnly: true
-          resources:
-            requests:
-              memory: '32Mi'
-              cpu: '10m'
-            limits:
-              memory: '64Mi'
-              cpu: '50m'
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            runAsNonRoot: true
-            runAsUser: 65534 # nobody
-            runAsGroup: 65534
-            capabilities:
-              drop:
-                - ALL
-          livenessProbe:
-            httpGet:
-              path: /metrics
-              port: 9187
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
-          readinessProbe:
-            httpGet:
-              path: /metrics
-              port: 9187
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            timeoutSeconds: 3
       volumes:
-        - name: exporter-config
+        - name: postgres-config
           configMap:
-            name: postgres-exporter-config
+            name: postgres-config
             items:
-              - key: postgres_exporter.yml
-                path: postgres_exporter.yml
+              - key: postgresql.conf
+                path: postgresql.conf
   volumeClaimTemplates:
     - metadata:
         name: postgres-data
@@ -203,27 +135,6 @@ spec:
       port: 5432
       targetPort: 5432
       protocol: TCP
-    - name: exporter
-      port: 9187
-      targetPort: 9187
-      protocol: TCP
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: postgres-read
-  namespace: linkding
-  labels:
-    app: postgres
-spec:
-  type: ClusterIP
-  selector:
-    app: postgres
-  ports:
-    - name: postgres
-      port: 5432
-      targetPort: 5432
-      protocol: TCP
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -231,7 +142,7 @@ metadata:
   name: postgres-backup
   namespace: linkding
 spec:
-  schedule: '0 19 * * *' # 8 PM CET (winter) / 9 PM CEST (summer) - Good time for backups after peak hours
+  schedule: '0 3 * * *'  # 3 AM daily
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
   jobTemplate:
@@ -268,9 +179,9 @@ spec:
                       name: postgres-secret
                       key: POSTGRES_DB
                 - name: POSTGRES_HOST
-                  value: postgres-read
+                  value: postgres
                 - name: BACKUP_RETENTION_DAYS
-                  value: '7' # Keep 7 days of backups
+                  value: '7'
               command:
                 - /bin/sh
                 - -c
@@ -283,28 +194,17 @@ spec:
 
                   echo "Starting backup at $(date)"
                   if pg_dump -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" | gzip > "$BACKUP_FILE"; then
-                    BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
-                    echo "Backup completed successfully: $BACKUP_FILE (Size: $BACKUP_SIZE)"
-                    
-                    # Verify backup integrity
-                    if gzip -t "$BACKUP_FILE" 2>/dev/null; then
-                      echo "Backup integrity verified"
-                    else
-                      echo "ERROR: Backup file is corrupted!" >&2
-                      rm -f "$BACKUP_FILE"
-                      exit 1
-                    fi
-                    
-                    # Cleanup old backups (keep last N days)
+                    echo "Backup completed: $BACKUP_FILE"
+                    gzip -t "$BACKUP_FILE" && echo "Backup verified"
                     find "$BACKUP_DIR" -name "linkding_backup_*.sql.gz" -type f -mtime +$BACKUP_RETENTION_DAYS -delete
-                    echo "Old backups cleaned up (retention: $BACKUP_RETENTION_DAYS days)"
+                    echo "Old backups cleaned"
                   else
                     echo "ERROR: Backup failed!" >&2
                     exit 1
                   fi
               securityContext:
                 allowPrivilegeEscalation: false
-                readOnlyRootFilesystem: false # Need to write backups
+                readOnlyRootFilesystem: false
                 capabilities:
                   drop:
                     - ALL
@@ -323,14 +223,3 @@ spec:
               persistentVolumeClaim:
                 claimName: postgres-backup-pvc
           restartPolicy: OnFailure
----
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: postgres-pdb
-  namespace: linkding
-spec:
-  minAvailable: 0 # Allow disruption since we only have 1 replica
-  selector:
-    matchLabels:
-      app: postgres

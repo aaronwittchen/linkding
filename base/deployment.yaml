@@ -5,9 +5,8 @@ metadata:
   namespace: linkding
   labels:
     app: linkding
-    version: '1.44.1'
 spec:
-  replicas: 2
+  replicas: 1
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -20,47 +19,14 @@ spec:
     metadata:
       labels:
         app: linkding
-        version: '1.44.1'
-      annotations:
-        prometheus.io/scrape: 'true'
-        prometheus.io/port: '9090'
-        prometheus.io/path: '/metrics'
     spec:
-      # Force IPv4-only DNS
-      dnsPolicy: None
-      dnsConfig:
-        nameservers:
-          - 10.96.0.10
-        searches:
-          - linkding.svc.cluster.local
-          - svc.cluster.local
-          - cluster.local
-        options:
-          - name: ndots
-            value: '5'
-          - name: single-request-reopen
-
       serviceAccountName: linkding
       securityContext:
         runAsNonRoot: true
         runAsUser: 33
         runAsGroup: 33
         fsGroup: 33
-        seccompProfile:
-          type: RuntimeDefault
       terminationGracePeriodSeconds: 30
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                labelSelector:
-                  matchExpressions:
-                    - key: app
-                      operator: In
-                      values:
-                        - linkding
-                topologyKey: kubernetes.io/hostname
       containers:
         - name: linkding
           image: sissbruecker/linkding:1.44.1
@@ -92,20 +58,20 @@ spec:
             - name: LD_DB_PORT
               value: '5432'
             - name: LD_SERVER_URL
-              value: 'https://linkding.local'
+              value: 'http://linkding.k8s.home'
             - name: LD_ALLOWED_HOSTS
-              value: 'linkding.local'
+              value: 'linkding.k8s.home'
             - name: LD_LOG_LEVEL
               value: 'INFO'
             - name: LD_ENABLE_BACKGROUND_TASKS
               value: 'true'
           resources:
             requests:
-              memory: '512Mi'
+              memory: '256Mi'
               cpu: '100m'
             limits:
-              memory: '1Gi'
-              cpu: '500m'
+              memory: '512Mi'
+              cpu: '300m'
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false
@@ -128,27 +94,16 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 3
-          startupProbe:
-            httpGet:
-              path: /health
-              port: 9090
-            failureThreshold: 20
-            periodSeconds: 5
-            timeoutSeconds: 3
           volumeMounts:
             - name: linkding-data
               mountPath: /etc/linkding/data
             - name: tmp
               mountPath: /tmp
-            - name: cache
-              mountPath: /var/cache
       volumes:
         - name: linkding-data
           persistentVolumeClaim:
             claimName: linkding-data-pvc
         - name: tmp
-          emptyDir: {}
-        - name: cache
           emptyDir: {}
 ---
 apiVersion: v1
@@ -165,14 +120,3 @@ spec:
       port: 9090
       targetPort: 9090
       protocol: TCP
----
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: linkding-pdb
-  namespace: linkding
-spec:
-  minAvailable: 1
-  selector:
-    matchLabels:
-      app: linkding

@@ -1,0 +1,30 @@
+# Optional Components Kustomization
+# Use this to selectively deploy optional features
+#
+# To use specific optional features, add them to your overlay:
+#
+# resources:
+#   - ../../base
+#   - ../../optional/network-policy.yaml
+#   - ../../optional/hpa.yaml
+#   - ../../optional/ldhc.yaml
+#   - ../../optional/monitoring.yaml
+#
+# Or use this file to deploy all optional components:
+# kubectl apply -k optional/
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: linkding
+
+resources:
+  - network-policy.yaml
+  - hpa.yaml
+  - ldhc.yaml
+  - monitoring.yaml
+  # - restic-backup.yaml  # Uncomment if using restic
+
+commonLabels:
+  app.kubernetes.io/part-of: linkding
+  app.kubernetes.io/component: optional

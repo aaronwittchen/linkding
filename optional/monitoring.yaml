@@ -1,0 +1,41 @@
+# ServiceMonitors for Prometheus
+# Requires Prometheus Operator (kube-prometheus-stack)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: linkding
+  namespace: linkding
+  labels:
+    app: linkding
+    release: prometheus  # Adjust to match your Prometheus release name
+spec:
+  selector:
+    matchLabels:
+      app: linkding
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+      - linkding
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: postgres
+  namespace: linkding
+  labels:
+    app: postgres
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: postgres
+  endpoints:
+    - port: metrics
+      interval: 30s
+  namespaceSelector:
+    matchNames:
+      - linkding

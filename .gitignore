@@ -1,18 +1,21 @@
-# Secrets
+# Secrets - NEVER commit these
 secrets.yaml
-linkding-api-secret.yaml
-postgres-tls-secret.yaml
+*-secret.yaml
+!optional/secrets.example.yaml
+.env
+.env.*
+*.env
+
+# TLS certificates and keys
 *.key
 *.crt
 *.pem
-.env
-
-# TLS certificates
+*.cert
 tls.key
 tls.crt
-*.cert
 
 # Backup files
+*.sql
 *.sql.gz
 backups/
 
@@ -20,13 +23,19 @@ backups/
 local-*.yaml
 *-local.yaml
 
+# Kustomize output
+kustomize-build/
+output/
+
 # Editor files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+*.bak
 
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini
