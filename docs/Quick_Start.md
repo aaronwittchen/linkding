@@ -6,19 +6,18 @@ This guide walks you through deploying Linkding on Kubernetes using Kustomize.
 
 - Kubernetes cluster (1.24+)
 - kubectl configured and connected
-- Ingress controller installed (nginx-ingress)
+- Gateway API with Envoy Gateway installed
 - Storage class available (Longhorn or local-path)
 
-### Check Ingress Controller
+### Check Gateway API
 
 ```bash
-kubectl get ingressclass
-```
+# Check Gateway is running
+kubectl get gateway -n envoy-gateway-system
 
-If you don't see `nginx`, install it:
-
-```bash
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.1/deploy/static/provider/cloud/deploy.yaml
+# Expected output:
+# NAME   CLASS   ADDRESS          PROGRAMMED   AGE
+# eg     eg      192.168.68.200   True         8h
 ```
 
 ## Step 1: Create Namespace
@@ -126,15 +125,22 @@ kubectl get pods -n linkding
 # Check services
 kubectl get svc -n linkding
 
-# Check ingress
-kubectl get ingress -n linkding
+# Check HTTPRoute
+kubectl get httproute -n linkding
 ```
 
 ## Step 7: Access Linkding
 
-### Via Ingress (Recommended)
+### Via Gateway (Recommended)
 
-Add DNS entry or hosts file:
+Add DNS entry in Pi-hole or hosts file:
+
+**Pi-hole:**
+1. Go to `http://192.168.68.10/admin`
+2. Navigate to **Local DNS** → **DNS Records**
+3. Add: `linkding.k8s.home` → `192.168.68.200`
+
+**Or hosts file:**
 
 ```bash
 # Linux/Mac
@@ -210,8 +216,8 @@ kubectl logs -n linkding -l app=linkding --tail=50
 # PostgreSQL logs
 kubectl logs -n linkding postgres-0 --tail=50
 
-# Ingress controller logs
-kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller --tail=50
+# Envoy Gateway logs
+kubectl logs -n envoy-gateway-system -l app.kubernetes.io/name=envoy --tail=50
 ```
 
 ### Check Events
@@ -235,14 +241,14 @@ kubectl rollout restart deployment/linkding -n linkding
 
 ## Summary Checklist
 
-- [ ] Ingress controller installed
+- [ ] Gateway API with Envoy Gateway running
 - [ ] Namespace created
 - [ ] PostgreSQL secret created
 - [ ] Deployed with Kustomize
 - [ ] Pods running
-- [ ] Ingress accessible
+- [ ] HTTPRoute attached to Gateway
+- [ ] DNS configured (Pi-hole or hosts file)
 - [ ] Admin user created
-- [ ] (Optional) TLS configured
 - [ ] (Optional) Network policies deployed
 - [ ] (Optional) LDHC deployed
 - [ ] (Optional) Monitoring deployed

@@ -14,11 +14,11 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # Allow from ingress controller
+    # Allow from Envoy Gateway
     - from:
         - namespaceSelector:
             matchLabels:
-              name: ingress-nginx
+              kubernetes.io/metadata.name: envoy-gateway-system
       ports:
         - protocol: TCP
           port: 9090

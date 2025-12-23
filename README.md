@@ -20,51 +20,34 @@ kubectl apply -k overlays/local-path/  # For local-path storage
 
 # 3. Verify deployment
 kubectl get pods -n linkding
+kubectl get httproute -n linkding
+
+# 4. Create admin user
+kubectl exec -it -n linkding deploy/linkding -- python manage.py createsuperuser
 ```
+
+## Initial Setup
+
+After deployment, create the admin user:
+
+```bash
+kubectl exec -it -n linkding deploy/linkding -- python manage.py createsuperuser
+```
+
+You will be prompted for:
+- Username
+- Email (optional, press Enter to skip)
+- Password
+
+Then access `http://linkding.k8s.home` and login with your credentials.
 
 ## Prerequisites
 
 - Kubernetes cluster (1.24+)
 - kubectl configured
-- Ingress controller (nginx-ingress recommended)
+- Gateway API with Envoy Gateway
 - Storage class (Longhorn or local-path)
 - Kustomize (built into kubectl 1.14+)
-
-## Directory Structure
-
-```
-linkding/
-├── base/                    # Core Kustomize base
-│   ├── kustomization.yaml   # Base configuration
-│   ├── namespace.yaml       # Namespace definition
-│   ├── service-accounts.yaml
-│   ├── postgres-config.yaml # PostgreSQL ConfigMap
-│   ├── pvcs.yaml            # Persistent Volume Claims
-│   ├── postgres.yaml        # PostgreSQL StatefulSet + backup CronJob
-│   ├── deployment.yaml      # Linkding Deployment + Service
-│   └── ingress.yaml         # Nginx Ingress
-│
-├── overlays/                # Environment-specific overlays
-│   ├── longhorn/            # Longhorn storage class
-│   └── local-path/          # Local-path storage class
-│
-├── optional/                # Optional components
-│   ├── kustomization.yaml   # Optional features kustomization
-│   ├── secrets.example.yaml # Secrets template (copy and modify)
-│   ├── network-policy.yaml  # Network security policies
-│   ├── hpa.yaml             # Horizontal Pod Autoscaler
-│   ├── ldhc.yaml            # Linkding Health Check CronJob
-│   ├── monitoring.yaml      # Prometheus ServiceMonitors
-│   └── restic-backup.yaml   # Restic backup integration
-│
-├── docs/                    # Documentation
-│   ├── Quick_Start.md
-│   ├── Deployment_Checklist.md
-│   └── ...
-│
-├── backup_linkding.sh       # Manual backup script
-└── restore_linkding.sh      # Manual restore script
-```
 
 ## Deployment Options
 
@@ -158,11 +141,11 @@ kubectl apply -k optional/
 
 Update the domain in these files before deploying:
 
-| File | Line | Value |
-|------|------|-------|
-| `base/deployment.yaml` | LD_SERVER_URL | `http://linkding.k8s.home` |
-| `base/deployment.yaml` | LD_ALLOWED_HOSTS | `linkding.k8s.home` |
-| `base/ingress.yaml` | host | `linkding.k8s.home` |
+| File                   | Line             | Value                      |
+| ---------------------- | ---------------- | -------------------------- |
+| `base/deployment.yaml` | LD_SERVER_URL    | `http://linkding.k8s.home` |
+| `base/deployment.yaml` | LD_ALLOWED_HOSTS | `linkding.k8s.home`        |
+| `base/httproute.yaml`  | hostnames        | `linkding.k8s.home`        |
 
 ### Storage Classes
 
@@ -188,12 +171,14 @@ images:
 [LDHC](https://github.com/sebw/linkding-healthcheck) automatically checks bookmarks for broken links.
 
 **Features:**
+
 - Checks all bookmarks for broken links (404, 403, DNS errors)
 - Tags broken links with `@HEALTH_HTTP_<code>`, `@HEALTH_DNS`, etc.
 - Finds duplicate bookmarks
 - Runs weekly (configurable in `optional/ldhc.yaml`)
 
 **Setup:**
+
 1. Deploy Linkding
 2. Generate API token in Settings -> API
 3. Create the API secret (see above)
@@ -231,8 +216,11 @@ kubectl get all -n linkding
 # Check pods
 kubectl get pods -n linkding
 
-# Check ingress
-kubectl get ingress -n linkding
+# Check HTTPRoute
+kubectl get httproute -n linkding
+
+# Check Gateway
+kubectl get gateway -n envoy-gateway-system
 
 # View logs
 kubectl logs -n linkding -l app=linkding
@@ -241,14 +229,14 @@ kubectl logs -n linkding postgres-0
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [Deploy.md](docs/Deploy.md) | Complete deployment guide |
-| [Quick_Start.md](docs/Quick_Start.md) | Quick reference for deployment |
+| Document                                                | Description                      |
+| ------------------------------------------------------- | -------------------------------- |
+| [Deploy.md](docs/Deploy.md)                             | Complete deployment guide        |
+| [Quick_Start.md](docs/Quick_Start.md)                   | Quick reference for deployment   |
 | [Deployment_Checklist.md](docs/Deployment_Checklist.md) | Detailed configuration checklist |
-| [Backup_And_Restore.md](docs/Backup_And_Restore.md) | Backup and restore procedures |
-| [Database_Operations.md](docs/Database_Operations.md) | PostgreSQL operations |
-| [Monitoring_Guide.md](docs/Monitoring_Guide.md) | Prometheus monitoring setup |
+| [Backup_And_Restore.md](docs/Backup_And_Restore.md)     | Backup and restore procedures    |
+| [Database_Operations.md](docs/Database_Operations.md)   | PostgreSQL operations            |
+| [Monitoring_Guide.md](docs/Monitoring_Guide.md)         | Prometheus monitoring setup      |
 
 ## Credits
 

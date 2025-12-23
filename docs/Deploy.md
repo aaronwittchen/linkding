@@ -6,9 +6,17 @@ Step-by-step guide to deploy Linkding on your Kubernetes cluster.
 
 - Kubernetes cluster running
 - Longhorn storage class configured
-- Nginx Ingress controller installed
+- Gateway API with Envoy Gateway installed
 - Pi-hole DNS (or hosts file configured)
 - kubectl connected to your cluster
+
+## Cluster Info
+
+| Component | Details |
+|-----------|---------|
+| Gateway | `eg` in `envoy-gateway-system` |
+| Gateway IP | `192.168.68.200` |
+| Domain | `linkding.k8s.home` |
 
 ## Deployment Steps
 
@@ -97,8 +105,11 @@ kubectl get all -n linkding
 # NAME                                  READY   AGE
 # statefulset.apps/postgres             1/1     3m
 
-# Check ingress
-kubectl get ingress -n linkding
+# Check HTTPRoute
+kubectl get httproute -n linkding
+
+# Check Gateway
+kubectl get gateway -n envoy-gateway-system
 
 # Check PVCs
 kubectl get pvc -n linkding
@@ -163,8 +174,8 @@ kubectl logs -n linkding -l app=linkding --tail=100
 # PostgreSQL logs
 kubectl logs -n linkding postgres-0 --tail=100
 
-# Ingress controller logs
-kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller --tail=100
+# Envoy Gateway logs
+kubectl logs -n envoy-gateway-system -l app.kubernetes.io/name=envoy --tail=100
 ```
 
 ### Check Events
@@ -191,13 +202,20 @@ kubectl exec -it -n linkding postgres-0 -- pg_isready
 kubectl exec -it -n linkding postgres-0 -- psql -U linkding -d linkding -c "SELECT 1"
 ```
 
-### Ingress Not Working
+### HTTPRoute Not Working
 
 ```bash
-# Check ingress status
-kubectl describe ingress -n linkding linkding-ingress
+# Check HTTPRoute status
+kubectl describe httproute -n linkding linkding
 
-# Test with port-forward
+# Check Gateway status
+kubectl get gateway -n envoy-gateway-system
+kubectl describe gateway -n envoy-gateway-system eg
+
+# Check Envoy pods
+kubectl get pods -n envoy-gateway-system
+
+# Test with port-forward (bypass Gateway)
 kubectl port-forward -n linkding svc/linkding 9090:9090
 # Then access http://localhost:9090
 ```
@@ -263,7 +281,8 @@ See [Backup_And_Restore.md](./Backup_And_Restore.md) for detailed restore proced
 - [ ] Deployed with Kustomize
 - [ ] PostgreSQL pod running
 - [ ] Linkding pod running
-- [ ] DNS configured (Pi-hole or hosts file)
+- [ ] HTTPRoute created and attached to Gateway
+- [ ] DNS configured (Pi-hole: `linkding.k8s.home` → `192.168.68.200`)
 - [ ] Linkding accessible via browser
 - [ ] Admin account created
 - [ ] (Optional) Network policies deployed
