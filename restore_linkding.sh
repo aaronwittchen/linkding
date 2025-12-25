@@ -1,28 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Full Linkding Restore Script (DB + Files)
+# Linkding Database Restore Script
+# Supports both PostgreSQL custom format (.sql.gz) and plain SQL dumps
 
 # Kubernetes namespace
 NAMESPACE="linkding"
-
-# Pod label for Postgres
-POSTGRES_LABEL="app=postgres"
 
 # Database credentials
 DB_USER="linkding"
 DB_NAME="linkding"
 
-# Backup archive to restore (required argument)
-BACKUP_FILE="$1"
+# Backup file to restore (required argument)
+BACKUP_FILE="${1:-}"
 
-# Restore targets
-LINKDING_CONFIG="/opt/linkding/config"
-LINKDING_DATA="/opt/linkding/data"
+# Usage
+usage() {
+    echo "Usage: $0 <backup_file.sql.gz>"
+    echo ""
+    echo "Restores a linkding PostgreSQL backup to the Kubernetes cluster."
+    echo "Supports both PostgreSQL custom format and plain SQL dumps."
+    echo ""
+    echo "Examples:"
+    echo "  $0 linkding_backup_20251204_160352.sql.gz"
+    echo "  $0 /path/to/backup.sql.gz"
+    exit 1
+}
 
 # Checks
 if [ -z "$BACKUP_FILE" ]; then
-    echo "Usage: $0 <backup_file.tar.gz>"
-    exit 1
+    usage
 fi
 
 if [ ! -f "$BACKUP_FILE" ]; then
@@ -31,74 +37,54 @@ if [ ! -f "$BACKUP_FILE" ]; then
 fi
 
 echo "============================================="
-echo "   LINKDING FULL RESTORE STARTED"
+echo "   LINKDING DATABASE RESTORE"
 echo "   Backup file: $BACKUP_FILE"
 echo "============================================="
 
-WORK_DIR=$(mktemp -d)
-echo "➤ Extracting backup..."
-tar -xzf "$BACKUP_FILE" -C "$WORK_DIR"
-echo "   ✓ Extracted to: $WORK_DIR"
-
-# STEP 1 — Restore PostgreSQL
-echo "➤ Locating PostgreSQL pod..."
-
-DB_POD=$(kubectl get pod -n "$NAMESPACE" -l "$POSTGRES_LABEL" -o jsonpath='{.items[0].metadata.name}')
+# Find postgres pod
+echo "Finding PostgreSQL pod..."
+DB_POD=$(kubectl get pod -n "$NAMESPACE" -l app=postgres -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
 
 if [ -z "$DB_POD" ]; then
     echo "ERROR: Could not find Postgres pod in namespace $NAMESPACE"
     exit 1
 fi
+echo "  Using pod: $DB_POD"
 
-echo "   → Using pod: $DB_POD"
+# Copy backup to pod
+echo "Copying backup file to pod..."
+kubectl cp "$BACKUP_FILE" "$NAMESPACE/$DB_POD:/tmp/backup.sql.gz"
+echo "  Done."
 
-DB_FILE="$WORK_DIR/linkding_db.sql.gz"
+# Drop and recreate database
+echo "Recreating database..."
+kubectl exec -n "$NAMESPACE" "$DB_POD" -- dropdb -U "$DB_USER" --if-exists "$DB_NAME"
+kubectl exec -n "$NAMESPACE" "$DB_POD" -- createdb -U "$DB_USER" "$DB_NAME"
+echo "  Done."
 
-if [ ! -f "$DB_FILE" ]; then
-    echo "ERROR: Database file not found in backup."
-    exit 1
+# Detect backup format and restore
+echo "Restoring database..."
+
+# Try pg_restore first (custom format), fall back to psql (plain SQL)
+if kubectl exec -n "$NAMESPACE" "$DB_POD" -- sh -c "gunzip -c /tmp/backup.sql.gz | pg_restore -U $DB_USER -d $DB_NAME --no-owner --no-privileges 2>/dev/null"; then
+    echo "  Restored using pg_restore (custom format)."
+else
+    echo "  Custom format failed, trying plain SQL..."
+    kubectl exec -n "$NAMESPACE" "$DB_POD" -- sh -c "gunzip -c /tmp/backup.sql.gz | psql -U $DB_USER -d $DB_NAME"
+    echo "  Restored using psql (plain SQL)."
 fi
-
-echo "➤ Restoring PostgreSQL database..."
-
-# Drop and recreate DB cleanly
-kubectl exec -n "$NAMESPACE" "$DB_POD" -- bash -c "
-  dropdb -U $DB_USER $DB_NAME; \
-  createdb -U $DB_USER $DB_NAME;
-"
-
-# Restore DB
-gunzip -c "$DB_FILE" | kubectl exec -i -n "$NAMESPACE" "$DB_POD" -- psql -U "$DB_USER" "$DB_NAME"
-
-echo "   ✓ Database restored."
-
-# STEP 2 — Restore config and data folders
-echo "➤ Restoring Linkding application files..."
-
-if [ -d "$WORK_DIR/config" ]; then
-    echo "   → Restoring config folder..."
-    sudo rm -rf "$LINKDING_CONFIG"
-    sudo cp -r "$WORK_DIR/config" "$LINKDING_CONFIG"
-    echo "     ✓ Config restored."
-fi
-
-if [ -d "$WORK_DIR/data" ]; then
-    echo "   → Restoring data folder..."
-    sudo rm -rf "$LINKDING_DATA"
-    sudo cp -r "$WORK_DIR/data" "$LINKDING_DATA"
-    echo "     ✓ Data restored."
-fi
-
-# STEP 3 — Restart Linkding
-echo "➤ Restarting Linkding deployment..."
-
-kubectl rollout restart deployment/linkding -n "$NAMESPACE"
-
-echo "   ✓ Linkding restarted."
 
 # Cleanup
-rm -rf "$WORK_DIR"
+echo "Cleaning up..."
+kubectl exec -n "$NAMESPACE" "$DB_POD" -- rm -f /tmp/backup.sql.gz
+echo "  Done."
+
+# Restart linkding
+echo "Restarting Linkding deployment..."
+kubectl rollout restart deployment/linkding -n "$NAMESPACE"
+kubectl rollout status deployment/linkding -n "$NAMESPACE" --timeout=120s
+echo "  Done."
 
 echo "============================================="
-echo "   LINKDING RESTORE COMPLETED SUCCESSFULLY"
+echo "   RESTORE COMPLETED SUCCESSFULLY"
 echo "============================================="
