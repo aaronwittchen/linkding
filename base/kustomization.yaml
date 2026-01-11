@@ -6,12 +6,14 @@ namespace: linkding
 resources:
   - namespace.yaml
   - service-accounts.yaml
-  - secrets.yaml
   - pvcs.yaml
   - postgres-config.yaml
   - postgres.yaml
   - deployment.yaml
   - httproute.yaml
+
+generators:
+  - secret-generator.yaml
 
 labels:
   - pairs:
