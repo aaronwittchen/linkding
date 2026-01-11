@@ -1,5 +1,5 @@
 # Gateway API HTTPRoute for Linkding
-# Requires Gateway API and Envoy Gateway installed
+# Requires Gateway API and Istio installed
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -9,10 +9,10 @@ metadata:
     app: linkding
 spec:
   parentRefs:
-    - name: eg
-      namespace: envoy-gateway-system
+    - name: cluster-gateway
+      namespace: istio-system
   hostnames:
-    - "linkding.k8s.home"
+    - "linkding.k8s.local"
   rules:
     - matches:
         - path:

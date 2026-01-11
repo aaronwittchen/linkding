@@ -1,0 +1,6 @@
+# SOPS Configuration for Linkding
+creation_rules:
+  - path_regex: .*\.(yaml|yml|json|env|ini)$
+    age: >-
+      age14c4u5y4uf869su746ghhear0ys4p6fuj6r0pvzrujj03dwh3xals40k30e
+    encrypted_regex: '^(data|stringData|password|token|key|secret|apiKey|apiToken|credential)$'

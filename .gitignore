@@ -1,5 +1,6 @@
-# Secrets - NEVER commit these
-secrets.yaml
+# Secrets - NEVER commit unencrypted
+# base/secrets.yaml is SOPS encrypted and safe to commit
+!base/secrets.yaml
 *-secret.yaml
 !optional/secrets.example.yaml
 .env

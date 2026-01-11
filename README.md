@@ -5,26 +5,49 @@ Production-grade Kubernetes deployment for [Linkding](https://github.com/sissbru
 ## Quick Start
 
 ```bash
-# 1. Create namespace and secrets
-kubectl create namespace linkding
-kubectl create secret generic postgres-secret \
-  --namespace=linkding \
-  --from-literal=POSTGRES_USER=linkding \
-  --from-literal=POSTGRES_PASSWORD="$(openssl rand -base64 32)" \
-  --from-literal=POSTGRES_DB=linkding
+# 1. Configure secrets
+cd base
+nano secrets.yaml  # Set your postgres password
 
-# 2. Deploy with Kustomize (choose your storage backend)
+# 2. Encrypt secrets with SOPS
+sops -e -i secrets.yaml
+
+# 3. Deploy with Kustomize (choose your storage backend)
 kubectl apply -k overlays/longhorn/    # For Longhorn storage
 # OR
 kubectl apply -k overlays/local-path/  # For local-path storage
 
-# 3. Verify deployment
+# 4. Verify deployment
 kubectl get pods -n linkding
 kubectl get httproute -n linkding
 
-# 4. Create admin user
+# 5. Create admin user
 kubectl exec -it -n linkding deploy/linkding -- python manage.py createsuperuser
 ```
+
+## ArgoCD Deployment
+
+This repository is configured for GitOps deployment with ArgoCD.
+
+1. Configure and encrypt secrets:
+   ```bash
+   nano base/secrets.yaml  # Set your postgres password
+   sops -e -i base/secrets.yaml
+   ```
+
+2. Commit and push:
+   ```bash
+   git add .
+   git commit -m "Configure linkding secrets"
+   git push
+   ```
+
+3. Deploy via ArgoCD UI or CLI:
+   ```bash
+   kubectl apply -f /path/to/ArgoCD/applications/linkding.yaml
+   ```
+
+ArgoCD will automatically sync changes from the `linkding/overlays/longhorn` path.
 
 ## Initial Setup
 
@@ -39,19 +62,24 @@ You will be prompted for:
 - Email (optional, press Enter to skip)
 - Password
 
-Then access `http://linkding.k8s.home` and login with your credentials.
+Then access `https://linkding.k8s.local` and login with your credentials.
 
 ## Prerequisites
 
 - Kubernetes cluster (1.24+)
 - kubectl configured
-- Gateway API with Envoy Gateway
+- Gateway API with Istio
 - Storage class (Longhorn or local-path)
 - Kustomize (built into kubectl 1.14+)
+- SOPS and age for secrets encryption
 
 ## Deployment Options
 
-### Option 1: Kustomize (Recommended)
+### Option 1: ArgoCD (Recommended)
+
+See [ArgoCD Deployment](#argocd-deployment) above.
+
+### Option 2: Kustomize
 
 ```bash
 # Preview what will be deployed
@@ -61,54 +89,51 @@ kubectl kustomize overlays/longhorn/
 kubectl apply -k overlays/longhorn/
 ```
 
-### Option 2: Direct Apply
+### Option 3: Direct Apply
 
 ```bash
 # Apply base resources individually
 kubectl apply -f base/namespace.yaml
 kubectl apply -f base/service-accounts.yaml
+kubectl apply -f base/secrets.yaml  # Must be SOPS encrypted first
 kubectl apply -f base/postgres-config.yaml
 kubectl apply -f base/pvcs.yaml
 kubectl apply -f base/postgres.yaml
 kubectl apply -f base/deployment.yaml
-kubectl apply -f base/ingress.yaml
+kubectl apply -f base/httproute.yaml
 ```
 
 ## Secrets Setup
 
-**Never commit secrets to Git.**
+Secrets are managed with [SOPS](https://github.com/mozilla/sops) encryption using age keys.
 
 ### Required: PostgreSQL Secret
 
+Edit `base/secrets.yaml` with your password, then encrypt:
+
 ```bash
-kubectl create secret generic postgres-secret \
-  --namespace=linkding \
-  --from-literal=POSTGRES_USER=linkding \
-  --from-literal=POSTGRES_PASSWORD="$(openssl rand -base64 32)" \
-  --from-literal=POSTGRES_DB=linkding
+# Edit the password
+nano base/secrets.yaml
+
+# Encrypt with SOPS
+sops -e -i base/secrets.yaml
+
+# Verify it's encrypted
+cat base/secrets.yaml  # Should show encrypted values
 ```
 
 ### Optional: API Secret (for LDHC)
 
-After deploying Linkding, generate an API token in the UI (Settings -> API), then:
+After deploying Linkding, generate an API token in the UI (Settings -> API), then add to secrets.
+
+### Decrypting Secrets
 
 ```bash
-kubectl create secret generic linkding-api-secret \
-  --namespace=linkding \
-  --from-literal=API_TOKEN='your-api-token-here'
-```
+# View decrypted content
+sops -d base/secrets.yaml
 
-### Using Template File
-
-```bash
-# Copy template
-cp optional/secrets.example.yaml secrets.yaml
-
-# Edit with your values
-vim secrets.yaml
-
-# Apply
-kubectl apply -f secrets.yaml
+# Edit encrypted file
+sops base/secrets.yaml
 ```
 
 ## Optional Features
@@ -139,13 +164,14 @@ kubectl apply -k optional/
 
 ### Domain Configuration
 
-Update the domain in these files before deploying:
+Currently configured for:
 
-| File                   | Line             | Value                      |
-| ---------------------- | ---------------- | -------------------------- |
-| `base/deployment.yaml` | LD_SERVER_URL    | `http://linkding.k8s.home` |
-| `base/deployment.yaml` | LD_ALLOWED_HOSTS | `linkding.k8s.home`        |
-| `base/httproute.yaml`  | hostnames        | `linkding.k8s.home`        |
+| File                   | Setting          | Value                       |
+| ---------------------- | ---------------- | --------------------------- |
+| `base/deployment.yaml` | LD_SERVER_URL    | `https://linkding.k8s.local` |
+| `base/deployment.yaml` | LD_ALLOWED_HOSTS | `linkding.k8s.local`        |
+| `base/httproute.yaml`  | hostnames        | `linkding.k8s.local`        |
+| `base/httproute.yaml`  | gateway          | `istio-system/cluster-gateway` |
 
 ### Storage Classes
 
@@ -190,7 +216,7 @@ images:
 - Security contexts with dropped capabilities
 - Network policies for traffic restriction
 - Read-only root filesystem where possible
-- Secrets managed outside Git
+- Secrets encrypted with SOPS/age
 
 ## Database & Backups
 
@@ -220,7 +246,7 @@ kubectl get pods -n linkding
 kubectl get httproute -n linkding
 
 # Check Gateway
-kubectl get gateway -n envoy-gateway-system
+kubectl get gateway -n istio-system
 
 # View logs
 kubectl logs -n linkding -l app=linkding

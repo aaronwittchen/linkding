@@ -58,9 +58,9 @@ spec:
             - name: LD_DB_PORT
               value: '5432'
             - name: LD_SERVER_URL
-              value: 'http://linkding.k8s.home'
+              value: 'https://linkding.k8s.local'
             - name: LD_ALLOWED_HOSTS
-              value: 'linkding.k8s.home'
+              value: 'linkding.k8s.local'
             - name: LD_LOG_LEVEL
               value: 'INFO'
             - name: LD_ENABLE_BACKGROUND_TASKS

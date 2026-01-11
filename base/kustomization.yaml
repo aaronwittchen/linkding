@@ -6,6 +6,7 @@ namespace: linkding
 resources:
   - namespace.yaml
   - service-accounts.yaml
+  - secrets.yaml
   - pvcs.yaml
   - postgres-config.yaml
   - postgres.yaml
