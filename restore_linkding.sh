@@ -15,6 +15,7 @@ BACKUP_FILE="${1:-}"
 
 # Internal
 SEPARATOR="============================================="
+DONE_MSG="  Done."
 
 # Usage
 usage() {
@@ -58,13 +59,13 @@ echo "  Using pod: $DB_POD"
 # Copy backup to pod
 echo "Copying backup file to pod..."
 kubectl cp "$BACKUP_FILE" "$NAMESPACE/$DB_POD:/tmp/backup.sql.gz"
-echo "  Done."
+echo "$DONE_MSG"
 
 # Drop and recreate database
 echo "Recreating database..."
 kubectl exec -n "$NAMESPACE" "$DB_POD" -- dropdb -U "$DB_USER" --if-exists "$DB_NAME"
 kubectl exec -n "$NAMESPACE" "$DB_POD" -- createdb -U "$DB_USER" "$DB_NAME"
-echo "  Done."
+echo "$DONE_MSG"
 
 # Detect backup format and restore
 echo "Restoring database..."
@@ -81,13 +82,13 @@ fi
 # Cleanup
 echo "Cleaning up..."
 kubectl exec -n "$NAMESPACE" "$DB_POD" -- rm -f /tmp/backup.sql.gz
-echo "  Done."
+echo "$DONE_MSG"
 
 # Restart linkding
 echo "Restarting Linkding deployment..."
 kubectl rollout restart deployment/linkding -n "$NAMESPACE"
 kubectl rollout status deployment/linkding -n "$NAMESPACE" --timeout=120s
-echo "  Done."
+echo "$DONE_MSG"
 
 echo "$SEPARATOR"
 echo "   RESTORE COMPLETED SUCCESSFULLY"

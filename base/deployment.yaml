@@ -21,6 +21,7 @@ spec:
         app: linkding
     spec:
       serviceAccountName: linkding
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 33
@@ -69,9 +70,11 @@ spec:
             requests:
               memory: '256Mi'
               cpu: '100m'
+              ephemeral-storage: '256Mi'
             limits:
               memory: '512Mi'
               cpu: '300m'
+              ephemeral-storage: '1Gi'
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false
