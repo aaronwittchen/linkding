@@ -51,9 +51,15 @@ ArgoCD will automatically sync changes from the `linkding/overlays/longhorn` pat
 
 ## Initial Setup
 
-After deployment, create the admin user:
+After deployment, run database migrations and create the admin user:
 
 ```bash
+export KUBECONFIG=/home/onion/k8s-nixos-cluster/kubeconfig
+
+# Run database migrations (required on first deploy)
+kubectl exec -it -n linkding deploy/linkding -- python manage.py migrate
+
+# Create admin user
 kubectl exec -it -n linkding deploy/linkding -- python manage.py createsuperuser
 ```
 
