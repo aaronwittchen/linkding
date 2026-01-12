@@ -13,6 +13,9 @@ DB_NAME="linkding"
 # Backup file to restore (required argument)
 BACKUP_FILE="${1:-}"
 
+# Internal
+SEPARATOR="============================================="
+
 # Usage
 usage() {
     echo "Usage: $0 <backup_file.sql.gz>"
@@ -24,29 +27,30 @@ usage() {
     echo "  $0 linkding_backup_20251204_160352.sql.gz"
     echo "  $0 /path/to/backup.sql.gz"
     exit 1
+    return 1
 }
 
 # Checks
-if [ -z "$BACKUP_FILE" ]; then
+if [[ -z "$BACKUP_FILE" ]]; then
     usage
 fi
 
-if [ ! -f "$BACKUP_FILE" ]; then
-    echo "ERROR: Backup file not found: $BACKUP_FILE"
+if [[ ! -f "$BACKUP_FILE" ]]; then
+    echo "ERROR: Backup file not found: $BACKUP_FILE" >&2
     exit 1
 fi
 
-echo "============================================="
+echo "$SEPARATOR"
 echo "   LINKDING DATABASE RESTORE"
 echo "   Backup file: $BACKUP_FILE"
-echo "============================================="
+echo "$SEPARATOR"
 
 # Find postgres pod
 echo "Finding PostgreSQL pod..."
 DB_POD=$(kubectl get pod -n "$NAMESPACE" -l app=postgres -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
 
-if [ -z "$DB_POD" ]; then
-    echo "ERROR: Could not find Postgres pod in namespace $NAMESPACE"
+if [[ -z "$DB_POD" ]]; then
+    echo "ERROR: Could not find Postgres pod in namespace $NAMESPACE" >&2
     exit 1
 fi
 echo "  Using pod: $DB_POD"
@@ -85,6 +89,6 @@ kubectl rollout restart deployment/linkding -n "$NAMESPACE"
 kubectl rollout status deployment/linkding -n "$NAMESPACE" --timeout=120s
 echo "  Done."
 
-echo "============================================="
+echo "$SEPARATOR"
 echo "   RESTORE COMPLETED SUCCESSFULLY"
-echo "============================================="
+echo "$SEPARATOR"

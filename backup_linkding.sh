@@ -23,6 +23,7 @@ LINKDING_DATA="/opt/linkding/data"
 RETENTION_COUNT=7
 
 # INTERNAL
+SEPARATOR="============================================="
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 WORK_DIR="$BACKUP_DIR/tmp_$TIMESTAMP"
 FINAL_ARCHIVE="$BACKUP_DIR/linkding_full_backup_$TIMESTAMP.tar.gz"
@@ -30,11 +31,11 @@ FINAL_ARCHIVE="$BACKUP_DIR/linkding_full_backup_$TIMESTAMP.tar.gz"
 mkdir -p "$BACKUP_DIR"
 mkdir -p "$WORK_DIR"
 
-echo "============================================="
+echo "$SEPARATOR"
 echo " LINKDING FULL BACKUP STARTED"
 echo " Timestamp: $TIMESTAMP"
 echo " Work directory: $WORK_DIR"
-echo "============================================="
+echo "$SEPARATOR"
 
 # Step 1 — PostgreSQL Backup via Kubernetes
 echo "➤ Finding PostgreSQL pod..."
@@ -84,7 +85,7 @@ ls -1t "$BACKUP_DIR"/linkding_full_backup_*.tar.gz | tail -n +$((RETENTION_COUNT
 
 echo "   ✓ Old backups cleaned."
 
-echo "============================================="
+echo "$SEPARATOR"
 echo " LINKDING FULL BACKUP COMPLETED SUCCESSFULLY "
 echo " Saved to: $FINAL_ARCHIVE"
-echo "============================================="
+echo "$SEPARATOR"
