@@ -33,6 +33,7 @@ spec:
               imagePullPolicy: Always
               env:
                 - name: API_URL
+                  # Internal cluster traffic - HTTP is safe for pod-to-pod communication
                   value: 'http://linkding:9090'
                 - name: API_TOKEN
                   valueFrom:
