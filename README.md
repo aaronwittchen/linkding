@@ -1,5 +1,7 @@
 # Linkding Kubernetes Deployment
 
+[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=aaronwittchen_linkding&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=aaronwittchen_linkding)
+
 Production-grade Kubernetes deployment for [Linkding](https://github.com/sissbruecker/linkding) - a self-hosted bookmark service.
 
 ## Quick Start

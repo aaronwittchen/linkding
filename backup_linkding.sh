@@ -52,14 +52,14 @@ echo "   ✓ Database backup completed."
 # Step 2 — Backup Linkding config/data folders
 echo "➤ Backing up Linkding config and data files..."
 
-if [ -d "$LINKDING_CONFIG" ]; then
+if [[ -d "$LINKDING_CONFIG" ]]; then
     cp -r "$LINKDING_CONFIG" "$WORK_DIR/config"
     echo "   ✓ Config folder archived."
 else
     echo "   ⚠ Config folder not found: $LINKDING_CONFIG"
 fi
 
-if [ -d "$LINKDING_DATA" ]; then
+if [[ -d "$LINKDING_DATA" ]]; then
     cp -r "$LINKDING_DATA" "$WORK_DIR/data"
     echo "   ✓ Data folder archived."
 else
